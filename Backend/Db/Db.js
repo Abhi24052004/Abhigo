@@ -2,11 +2,21 @@ const mong=require("mongoose");
 
 function main()
 {
-   mong.connect(process.env.DB_Connect)
-    .then(()=>{
-        console.log("conected to mongo..");
-    })
-    .catch((er)=>{console.log("ereor")})
-}
+   mong.connect(process.env.DB_Connect, {
 
+  useNewUrlParser: true,
+  useUnifiedTopology: true,
+
+ 
+  serverSelectionTimeoutMS: 30000, 
+
+  
+  socketTimeoutMS: 45000,
+
+ 
+  maxPoolSize: 10
+})
+  .then(() => console.log("MongoDB connected"))
+  .catch(err => console.error(" MongoDB connection error:", err));
+}
 module.exports=main;
