@@ -208,7 +208,7 @@ function Home() {
     
     */
     <div className='h-screen relative overflow-hidden'>
-      <div className="h-screen w-screen"><img className="h-full w-full object-cover" src="https://miro.medium.com/v2/resize:fit:1400/0*gwMx05pqII5hbfmX.gif" alt="not found" /></div>
+      <div className="h-screen w-screen"><img className="h-full w-full object-cover" src="https://drive.google.com/file/d/1WHfgBF8mg3gzqYPtag9qyXxKTkyKuwx5/view?usp=sharing" alt="not found" /></div>
       <div className=" flex flex-col justify-end h-screen absolute top-0 w-full " >
         <div className="h-[30%] w-full bg-white  relative ">
           <h4 className="absolute right-0 top-3 opacity-0" ref={panelOption}><i className="ri-arrow-down-wide-line" onClick={() => setPanelOpen(false)}></i></h4>
