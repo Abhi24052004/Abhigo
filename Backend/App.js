@@ -8,6 +8,8 @@ const app=expres();
 const userRoute=require("./routes/user.routes");
 const captainRoute=require("./routes/captain.routes");
 const mapsRoutes=require("./routes/map.routes");
+const rideRoutes = require('./routes/ride.routes');
+
 
 main();
 app.use(cors());
@@ -18,6 +20,7 @@ app.use(cookieParser());
 app.use("/users",userRoute);
 app.use("/captains",captainRoute);
 app.use('/maps',mapsRoutes);
+app.use('/rides', rideRoutes);
 app.get("/",(req,res)=>{
     res.send("Helloo world")
 });
