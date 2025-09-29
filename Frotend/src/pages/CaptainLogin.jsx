@@ -31,7 +31,7 @@ function CaptainLogin() {
     <div className="p-7 flex flex-col justify-between h-screen">
 
       <div>
-        <img src="../src/img/abhi.png" alt="abhi" className=" h-25 w-60 mb-2" />
+        <img src="https://drive.google.com/file/d/1l095Eyg-YMh7ez9JOUvibMNTO2jl1Dmw/view?usp=sharing" alt="abhi" className=" h-25 w-60 mb-2" />
         <form onSubmit={(e) => { handleSubmit(e) }}>
           <h3 className="text-lg font-semibold mb-3">What is your Email ? </h3>
           <input required type="email" value={email} onChange={(e) => { setEmail(e.target.value) }} placeholder="example@gmail.com" className="text-lg mb-5 bg-[#eeeeee] placeholder:base border w-full px-4 py-2 " />
