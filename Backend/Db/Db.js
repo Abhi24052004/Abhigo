@@ -3,7 +3,8 @@ const mong=require("mongoose");
 
 function main()
 {
-   mong.connect(process.env.DB_Connect, {
+   console.log(process.env.DB_CONNECT);
+   mong.connect(process.env.DB_CONNECT, {
 
   useNewUrlParser: true,
   useUnifiedTopology: true,
