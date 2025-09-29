@@ -1,7 +1,7 @@
 //const mong=require("mongoose");
 import mong from "mongoose";
 
-function main()
+export default function main()
 {
    mong.connect(process.env.DB_Connect, {
 
@@ -20,4 +20,4 @@ function main()
   .then(() => console.log("MongoDB connected"))
   .catch(err => console.error(" MongoDB connection error:", err));
 }
-module.exports=main;
+
