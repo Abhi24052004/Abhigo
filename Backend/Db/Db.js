@@ -1,7 +1,7 @@
-//const mong=require("mongoose");
-import mong from "mongoose";
+const mong=require("mongoose");
 
-export default function main()
+
+function main()
 {
    mong.connect(process.env.DB_Connect, {
 
@@ -20,4 +20,4 @@ export default function main()
   .then(() => console.log("MongoDB connected"))
   .catch(err => console.error(" MongoDB connection error:", err));
 }
-
+modeule.exports=main
