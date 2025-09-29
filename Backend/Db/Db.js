@@ -1,4 +1,5 @@
-const mong=require("mongoose");
+//const mong=require("mongoose");
+import mong from "mongoose";
 
 function main()
 {
