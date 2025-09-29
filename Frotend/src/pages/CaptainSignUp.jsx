@@ -67,7 +67,8 @@ const CaptainSignup = () => {
 return (
   <div className='py-5 px-5 h-screen flex flex-col justify-between'>
     <div>
-      <img src="https://drive.google.com/file/d/1l095Eyg-YMh7ez9JOUvibMNTO2jl1Dmw/view?usp=sharing" alt="abhi" className=" h-25 w-60 mb-2" />
+      <a href="https://ibb.co/s9TQppx8"><img src="https://i.ibb.co/0y0Zpp4H/abhi.png" alt="abhi" border="0" className=" h-25 w-60 mb-2" /></a>
+      {/* <img src="https://drive.google.com/file/d/1l095Eyg-YMh7ez9JOUvibMNTO2jl1Dmw/view?usp=sharing" alt="abhi" className=" h-25 w-60 mb-2" /> */}
 
       <form onSubmit={(e) => {
         submitHandler(e)
