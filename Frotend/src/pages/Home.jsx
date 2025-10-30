@@ -1,4 +1,4 @@
-import React, { useState, useRef } from "react";
+import React, { useState, useRef, use } from "react";
 import 'remixicon/fonts/remixicon.css'
 // import { useState, useRef } from 'react'
 import { useGSAP } from '@gsap/react';
@@ -9,6 +9,12 @@ import ConfirmRide from '../components/ConfirmRide';
 import LookingForDriver from '../components/LookingForDriver';
 import Driver from '../components/Driver';
 import axios from "axios";
+import { SocketContext } from '../context/SocketContext';
+import { useContext } from 'react';
+import { UserDataContext } from '../context/UserContext';
+import { useEffect } from "react";
+import { useNavigate } from "react-router-dom";
+import LiveTracking from "../components/LiveTracking";
 
 
 function Home() {
@@ -33,12 +39,26 @@ function Home() {
   const [pickupSuggestions, setPickupSuggestions] = useState([])
   const [destinationSuggestions, setDestinationSuggestions] = useState([])
   const [vehiclePanel, setVehiclePanel] = useState(false)
+  const [ride, setRide] = useState(null);
   const vehiclePanelRef = useRef(null)
-
+  const navigate = useNavigate()
   const submitHandler = (e) => {
     e.preventDefault();
 
   }
+
+
+  const { socket } = useContext(SocketContext)
+  const { user } = useContext(UserDataContext)
+
+  useEffect(() => {
+    console.log("user-detail", user);
+    socket.emit("join", { userType: "user", userId: user._id })
+  }, [user])
+
+  useEffect(() => {
+    console.log(user);
+  }, [])
 
   const handlePickupChange = async (e) => {
     setPickup(e.target.value)
@@ -57,6 +77,19 @@ function Home() {
       // handle error
     }
   }
+
+  socket.on('ride-confirmed', (ride) => {
+    console.log("ride-confirmed-received", ride);
+    setVehicleFound(false)
+    setDriverPanel(true)
+    setRide(ride)
+  })
+
+  socket.on('ride-started', ride => {
+    console.log("ride")
+    setDriverPanel(false)
+    navigate('/riding', { state: { ride } }) // Updated navigate to include ride data
+  })
 
   const handleDestinationChange = async (e) => {
     setDestination(e.target.value)
@@ -91,7 +124,9 @@ function Home() {
   }
 
   async function createRide() {
+
     const response = await axios.post(`${import.meta.env.VITE_BASE_URL}/rides/create`, {
+      userId: user._id,
       pickup,
       destination,
       vehicleType
@@ -117,13 +152,13 @@ function Home() {
     }
   }, [driverPanel]);
 
-useGSAP(() => {
-  gsap.to(vehicleFoundRef.current, {
-    y: vehicleFound ? "0%" : "100%",
-    duration: 0.5,
-    ease: "power2.inOut"
-  });
-}, [vehicleFound]);
+  useGSAP(() => {
+    gsap.to(vehicleFoundRef.current, {
+      y: vehicleFound ? "0%" : "100%",
+      duration: 0.5,
+      ease: "power2.inOut"
+    });
+  }, [vehicleFound]);
 
 
 
@@ -189,7 +224,7 @@ useGSAP(() => {
 
   return (
     <div className='h-screen relative overflow-hidden'>
-      <div className="h-screen w-screen"><img className="h-full w-full object-cover" src="https://miro.medium.com/v2/resize:fit:1400/0*gwMx05pqII5hbfmX.gif" alt="not found" /></div>
+      <div className="h-screen w-screen"><LiveTracking /></div>
       <div className=" flex flex-col justify-end h-screen absolute top-0 w-full " >
         <div className="h-[30%] w-full bg-white  relative ">
           <h5 ref={panelCloseRef} onClick={() => {
@@ -262,11 +297,15 @@ useGSAP(() => {
           setVehicleFound={setVehicleFound} />
       </div>
 
-      <div className="translate-y-full py-3 flex flex-col gap-3 fixed bottom-0 bg-white w-screen" ref={driverPanelRef} >
-        <Driver setDriverPanel={setDriverPanel} />
+      <div ref={driverPanelRef} className='fixed w-full  z-10 bottom-0  bg-white px-3 py-6 pt-12'>
+        <Driver
+          ride={ride}
+          setVehicleFound={setVehicleFound}
+          setWaitingForDriver={setDriverPanel}
+          waitingForDriver={driverPanel} />
       </div>
 
-     
+
     </div>
   )
 }
