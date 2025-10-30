@@ -14,6 +14,7 @@ function CaptainLogout() {
     ).then((res) => {
         if (res.status === 200) {
             localStorage.removeItem("token");
+            localStorage.removeItem("captain");
             naviagate("/captain/login");
         }}).catch((err) => {
             console.log("Logout failed", err);
