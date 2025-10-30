@@ -1,31 +1,55 @@
-import { createContext, useState, useContext } from 'react';
+import { createContext, useState, useEffect } from "react";
 
 export const CaptainDataContext = createContext();
 
 const CaptainContext = ({ children }) => {
-    const [ captain, setCaptain ] = useState(null);
-    const [ isLoading, setIsLoading ] = useState(false);
-    const [ error, setError ] = useState(null);
+ 
+  const [captain, setCaptain] = useState(() => {
+    try {
+      const stored = localStorage.getItem("captain");
+      return stored ? JSON.parse(stored) : null;
+    } catch (error) {
+      console.error("Error reading captain from storage:", error);
+      return null;
+    }
+  });
 
-    const updateCaptain = (captainData) => {
-        setCaptain(captainData);
-    };
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState(null);
 
-    const value = {
-        captain,
-        setCaptain,
-        isLoading,
-        setIsLoading,
-        error,
-        setError,
-        updateCaptain
-    };
 
-    return (
-        <CaptainDataContext.Provider value={value}>
-            {children}
-        </CaptainDataContext.Provider>
-    );
+  useEffect(() => {
+    if (captain) {
+      const safeData = { ...captain, password: '' }
+      localStorage.setItem("captain", JSON.stringify(safeData));
+    } else {
+     
+      localStorage.removeItem("captain");
+    }
+  }, [captain]);
+
+  const logoutCaptain = () => {
+    setCaptain(null);
+    localStorage.removeItem("captain");
+    localStorage.removeItem("token");
+  };
+
+
+  const value = {
+    captain,
+    setCaptain,
+    isLoading,
+    setIsLoading,
+    error,
+    setError,
+    logoutCaptain,
+  };
+
+  return (
+    <CaptainDataContext.Provider value={value}>
+      {children}
+    </CaptainDataContext.Provider>
+  );
 };
 
 export default CaptainContext;
