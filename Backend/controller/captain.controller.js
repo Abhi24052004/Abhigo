@@ -7,7 +7,7 @@ const { validationResult } = require('express-validator');
 module.exports.registerCaptain=async(req,res,next)=>{
     const eror=validationResult(req);
     if(!eror.isEmpty()){
-        console.log("k");
+        
         return res.status(400).json({message:eror.array()});
     }
     const {fullname,email,password,status,vehicle,location}=req.body;
