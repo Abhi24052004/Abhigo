@@ -1,22 +1,35 @@
-import React, { createContext } from 'react'
-import { useState } from 'react'
-
+import React, { createContext, useState, useEffect } from 'react';
 
 export const UserDataContext = createContext();
-function UserContext({ children }) {
-    const [user,setUser]=useState({
-    
-        email:"",
-        password:""
-    })
+
+const UserContext = ({ children }) => {
+    // Initialize from localStorage if available
+    const [user, setUser] = useState(() => {
+        try {
+            const stored = localStorage.getItem("user");
+            return stored ? JSON.parse(stored) : null;
+        } catch (error) {
+            console.error("Error reading user from storage:", error);
+            return null;
+        }
+    });
+
+
+    useEffect(() => {
+        if (user) {
+            const safeData = { ...user, password: '' }
+            localStorage.setItem("user", JSON.stringify(safeData));
+        } else {
+
+            localStorage.removeItem("user");
+        }
+    }, [user]);
+
     return (
-        <div>
-            <UserDataContext.Provider value={{user,setUser}}>
-                {children}
-            </UserDataContext.Provider>
+        <UserDataContext.Provider value={{ user, setUser }}>
+            {children}
+        </UserDataContext.Provider>
+    );
+};
 
-        </div>
-    )
-}
-
-export default UserContext
+export default UserContext;
