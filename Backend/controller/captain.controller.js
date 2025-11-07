@@ -7,7 +7,7 @@ const { validationResult } = require('express-validator');
 module.exports.registerCaptain=async(req,res,next)=>{
     const eror=validationResult(req);
     if(!eror.isEmpty()){
-        
+        console.log("k");
         return res.status(400).json({message:eror.array()});
     }
     const {fullname,email,password,status,vehicle,location}=req.body;
@@ -51,9 +51,11 @@ module.exports.loginCaptain=async( req,res,next)=>{
     res.status(200).json({captain,token});
 }
 
-module.exports.getprofile=async(req,res,next)=>{    
+module.exports.getprofile=async(req,res,next)=>{  
     res.status(200).json(req.captain);
 }
+
+
 
 module.exports.logoutCaptain=async(req,res,next)=>{
     await blackListModel.create({token:req.token});
