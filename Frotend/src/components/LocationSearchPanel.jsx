@@ -1,6 +1,8 @@
 import React from 'react'
-const LocationSearchPanel = ({ suggestions, setVehiclePanel, setPanelOpen, setPickup, setDestination, activeField }) => {
+import { useState, useEffect } from 'react'
 
+const LocationSearchPanel = ({ suggestions, setVehiclePanel, setPanelOpen, setPickup, setDestination, activeField,show, setShow }) => {
+   
     const handleSuggestionClick = (suggestion) => {
         if (activeField === 'pickup') {
             setPickup(suggestion)
@@ -8,12 +10,14 @@ const LocationSearchPanel = ({ suggestions, setVehiclePanel, setPanelOpen, setPi
             setDestination(suggestion)
         }
         
+        setShow(false)
     }
 
     return (
-        <div className="h-full overflow-y-auto">
-            
-            {   
+        <div className={`h-full overflow-y-auto transition-opacity duration-300 ${!show ? "opacity-0 pointer-events-none" : "opacity-100"
+            }`}>
+
+            {
                 suggestions.map((elem, idx) => (
                     <div key={idx} onClick={() => handleSuggestionClick(elem)} className='flex gap-4 border-2 p-3 border-gray-50 active:border-black rounded-xl items-center my-2 justify-start '>
                         <h2 className='bg-[#eee] h-8 flex items-center justify-center w-12 rounded-full'><i className="ri-map-pin-fill"></i></h2>
