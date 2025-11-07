@@ -21,7 +21,6 @@ const UserContext = ({ children }) => {
             localStorage.setItem("user", JSON.stringify(safeData));
         } else {
 
-            localStorage.removeItem("user");
         }
     }, [user]);
 
