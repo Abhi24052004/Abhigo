@@ -24,7 +24,6 @@ const CaptainContext = ({ children }) => {
       localStorage.setItem("captain", JSON.stringify(safeData));
     } else {
      
-      localStorage.removeItem("captain");
     }
   }, [captain]);
 
