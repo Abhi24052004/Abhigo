@@ -61,6 +61,15 @@ const LiveTracking = () => {
         if (currentPosition && typeof map.panTo === 'function') map.panTo(currentPosition);
     };
 
+    // Map options: disable the zoom control buttons and fullscreen control (the square in your screenshot)
+    const mapOptions = {
+      zoomControl: false,          // removes the +/- zoom control
+      fullscreenControl: false,    // removes the fullscreen (square-corners) control
+      streetViewControl: false,    // optional: removes the pegman Street View control
+      mapTypeControl: false        // optional: removes map type (Satellite) control
+      // If you want to remove everything, use: disableDefaultUI: true
+    }
+
     return (
         <LoadScript googleMapsApiKey={import.meta.env.VITE_GOOGLE_MAPS_API_KEY}>
             <GoogleMap
@@ -68,6 +77,7 @@ const LiveTracking = () => {
                 center={currentPosition}
                 zoom={15}
                 onLoad={handleMapLoad}
+                options={mapOptions}
             >
                 <Marker position={currentPosition} />
             </GoogleMap>
