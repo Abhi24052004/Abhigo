@@ -1,3 +1,4 @@
+const { request } = require('express');
 const mongoose = require('mongoose');
 
 
@@ -51,8 +52,16 @@ const rideSchema = new mongoose.Schema({
     otp: {
         type: String,
         select: false,
-        required: true,
+        // required: true,
     },
-})
+    eventDateTime: {
+        type: Date,              
+        required: false,         
+    },
+    specialRequest:{
+        type: String,
+        required: false
+    }
+}, { timestamps: true });
 
 module.exports = mongoose.model('ride', rideSchema);
