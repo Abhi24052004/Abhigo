@@ -38,6 +38,7 @@ function CaptainHome() {
   }, [captain]);
 
   useEffect(() => {
+    console.log("welcome");
     if (!captain) return;
 
     socket.emit('join', {
