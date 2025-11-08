@@ -3,7 +3,7 @@ import { Link, useLocation } from 'react-router-dom'
 import FinishRide from '../components/FinishRide'
 import { useGSAP } from '@gsap/react'
 import gsap from 'gsap'
-import LiveTracking from '../components/updatedLiveTracking' // use the updated tracker
+import LiveTracking from '../components/updatedLiveTracking'
 
 const CaptainRiding = () => {
   const [finishRidePanel, setFinishRidePanel] = useState(false)
@@ -39,8 +39,8 @@ const CaptainRiding = () => {
 
       {/* Map: ensure it sits below the top controls and fills remaining height */}
       <div className="h-[calc(100vh-80px)] fixed w-screen top-0 z-[-1]">
-        {/* For the captain app, the device geolocation should represent the captain; pass User={false} */}
-        <LiveTracking ride={rideData} User={false} />
+        {/* here we want destination routing (if available) */}
+        <LiveTracking ride={rideData} User={false} target="destination" />
       </div>
     </div>
   )
