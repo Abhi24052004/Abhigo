@@ -2,28 +2,23 @@ import React from 'react'
 import LiveTracking from '../components/updatedLiveTracking'
 
 function ArrivedAtPickup(props) {
-  // fixed bottom control height (80px) and ensure map container gets explicit height
-  const MAP_CONTAINER_STYLE = { height: 'calc(100vh - 80px)', width: '100%' }
-
-  const [isUser, setIsUser] = React.useState(false)
-  const handleRide = () => {
-    props.setArrivedPopUpPanel(false)
-    props.setConfirmRidePopUpPanel(true)
-  }
-  return (
-    <div className="h-screen w-full flex flex-col">
-      <div style={{ height: '2%' }} />
-      <div style={MAP_CONTAINER_STYLE}>
-        {/* explicitly target pickup on this page */}
-        <LiveTracking ride={props.ride} User={isUser} target="pickup" />
-      </div>
-      <div className="w-full bg-white p-4" style={{ height: 80 }}>
-        <button onClick={handleRide} className="w-full mt-2 bg-green-500 text-lg text-white font-semibold p-3 rounded-lg text-center">
-          Arrived At PickupPoint
-        </button>
-      </div>
-    </div>
-  )
+    const [isUser,setIsUser]=React.useState(false);
+    const handleRide=()=>{
+        props.setArrivedPopUpPanel(false);
+        props.setConfirmRidePopUpPanel(true);
+    }
+    return (
+        <div className='h-screen'>
+            {/* Top half: live map tracking (same as Riding.jsx) */}
+            <div className="h-[2%]"></div>
+            <div className='h-[90%]'>
+                <LiveTracking ride={props.ride} User={isUser} />
+            </div>
+            <div className='fixed bottom-0 w-full bg-white p-4'>
+                <button onClick={handleRide} className='w-full mt-2  bg-green-500 text-lg text-white font-semibold p-3 rounded-lg text-center'>Arrived At PickupPoint</button>
+            </div>
+        </div>
+    )
 }
 
 export default ArrivedAtPickup
