@@ -384,6 +384,16 @@ export default function Home() {
     }
   }, [eventVehiclePanel])
 
+  // Normalize fare for LookingForDriver to avoid undefined indexing in production
+  const normalizedFare = React.useMemo(() => {
+    if (typeof fare === 'number') {
+      const key = vehicleType || 'car';
+      return { [key]: fare };
+    }
+    if (fare && typeof fare === 'object') return fare;
+    return {};
+  }, [fare, vehicleType]);
+
   useGSAP(function () {
     if (panelOpen) {
       gsap.to(panelRef.current, {
@@ -637,7 +647,7 @@ export default function Home() {
       </div>
 
       <div ref={vehicleFoundRef} className='fixed w-full z-10 bottom-0 translate-y-full bg-white px-3 py-6 pt-12'>
-        <LookingForDriver createRide={createRide} pickup={pickup} destination={destination} fare={fare} vehicleType={vehicleType} setVehicleFound={setVehicleFound} />
+        <LookingForDriver createRide={createRide} pickup={pickup} destination={destination} fare={normalizedFare} vehicleType={vehicleType} setVehicleFound={setVehicleFound} />
       </div>
 
       <div ref={driverPanelRef} className='fixed w-full  z-10 bottom-0  bg-white px-3 py-6 pt-12'>
