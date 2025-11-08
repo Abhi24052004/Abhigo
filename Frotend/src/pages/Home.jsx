@@ -137,6 +137,7 @@ export default function Home() {
   const [selectedRide, setSelectedRide] = useState(null);
 
   useEffect(() => {
+    console.log("WELCOM2");
     if (!user) return;
     socket.emit("join", { userType: "user", userId: user._id })
     async function getRides() {
