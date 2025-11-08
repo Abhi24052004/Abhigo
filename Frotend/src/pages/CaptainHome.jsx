@@ -12,12 +12,55 @@ import axios from 'axios';
 import ArrivedAtPickup from '../components/ArrivedAtPickup';
 
 function CaptainHome() {
+  // Defensive Context Hydration & Loading
+  const { captain, setCaptain } = useContext(CaptainDataContext);
+
+  useEffect(() => {
+    // On initial mount, try to hydrate if captain missing but exists in localStorage
+    if (!captain) {
+      try {
+        const stored = localStorage.getItem('captain');
+        if (stored) setCaptain(JSON.parse(stored));
+      } catch (e) {}
+    }
+  }, [captain, setCaptain]);
+
+  // Defensive: only render when captain is fully hydrated
+  if (
+    !captain ||
+    !captain.vehicle ||
+    !captain.vehicleType ||
+    !captain.fare
+  ) {
+    return (
+      <div className="h-screen flex items-center justify-center text-lg font-semibold">
+        Loading captain data...
+      </div>
+    );
+  }
+
+  // Component State
   const [ridePopUpPanel, setRidePopUpPanel] = useState(false);
   const [eventRidePopUpPanel, setEventRidePopUpPanel] = useState(false);
   const [startEventRidePopUpPanel, setStartEventRidePopUpPanel] = useState(false);
   const [confirmRidePopUpPanel, setConfirmRidePopUpPanel] = useState(false);
   const [eventConfirmRidePopUpPanel, setEventConfirmRidePopUpPanel] = useState(false);
 
+  const [arrivedPopUpPanel, setArrivedPopUpPanel] = useState(false);
+
+  const [ride, setRide] = useState(null);
+  const [eventRide, setEventRide] = useState(null);
+
+  // Socket/context
+  const { socket } = useContext(SocketContext);
+
+  // Refs
+  const captainRef = useRef(null);
+  useEffect(() => {
+    captainRef.current = captain;
+  }, [captain]);
+
+  // GSAP Refs
   const ridePopUpRef = useRef();
   const eventRidePopUpRef = useRef();
   const startEventRidePopUpRef = useRef();
@@ -25,21 +68,9 @@ function CaptainHome() {
   const eventConfirmRidePopUpRef = useRef();
   const aproachingToPickupRef = useRef();
 
-  const [arrivedPopUpPanel, setArrivedPopUpPanel] = useState(false);
-
-  const [ride, setRide] = useState(null);
-  const [eventRide, setEventRide] = useState(null);
-  const { socket } = useContext(SocketContext);
-  const { captain } = useContext(CaptainDataContext);
-
-  const captainRef = useRef(null);
+  // Join Room on Captain data available
   useEffect(() => {
-    captainRef.current = captain;
-  }, [captain]);
-
-  useEffect(() => {
-    if (!captain) return <div>Loading...</div>;
-
+    if (!captain) return;
     socket.emit('join', {
       userId: captain._id,
       userType: 'captain',
@@ -48,7 +79,6 @@ function CaptainHome() {
     const updateLocation = () => {
       if (navigator.geolocation) {
         navigator.geolocation.getCurrentPosition((position) => {
-          console.log("get_Coord", position.coords.latitude + " " + position.coords.longitude);
           socket.emit('update-location-captain', {
             userId: captain._id,
             location: {
@@ -64,40 +94,31 @@ function CaptainHome() {
     updateLocation();
 
     return () => clearInterval(locationInterval);
-  }, [captain]);
+  }, [captain, socket]);
 
-
-
+  // Listen for new ride
   useEffect(() => {
     const onNewRide = (data) => {
       const cap = captainRef.current;
-  console.log('new-ride received', { data, captainVehicle: cap?.vehicle?.vehicleType });
-      if (!cap) {
-        console.log('Captain not ready yet; ignoring this new-ride for now');
-        return;
-      }
+      if (!cap) return;
 
       if ('vehicleType' in data) {
         if (cap.vehicle?.vehicleType === data.vehicleType) {
           setRide(data);
           setRidePopUpPanel(true);
-        } else {
-          console.log('Vehicle type mismatch; ignoring ride');
         }
       } else {
         if (cap.vehicle?.vehicleType === 'car') {
           setEventRide(data);
           setEventRidePopUpPanel(true);
-        } else {
-          console.log('Event ride ignored for non-car vehicle');
         }
       }
     };
-
     socket.on('new-ride', onNewRide);
     return () => socket.off('new-ride', onNewRide);
   }, [socket]);
 
+  // Listen for ride-claimed
   useEffect(() => {
     const onRideClaimed = (payload) => {
       const claimedId = payload?.rideId;
@@ -118,19 +139,13 @@ function CaptainHome() {
         setEventRide(null);
       }
     };
-
     socket.on('ride-claimed', onRideClaimed);
     return () => socket.off('ride-claimed', onRideClaimed);
   }, [socket, ride, eventRide]);
 
-
-
-
+  // Confirm ride
   async function confirmRide() {
     if (!ride) return;
-
-    console.log('confirm-ride-called');
-
     await axios.post(
       `${import.meta.env.VITE_BASE_URL}/rides/confirm`,
       {
@@ -143,16 +158,10 @@ function CaptainHome() {
         },
       }
     );
-
-    // setRidePopUpPanel(false);
-    // setConfirmRidePopUpPanel(true);
   }
 
   async function confirmEventRide() {
     if (!eventRide) return;
-
-    console.log('confirm-event-ride-called');
-
     const response = await axios.post(
       `${import.meta.env.VITE_BASE_URL}/rides/confirm`,
       {
@@ -165,10 +174,10 @@ function CaptainHome() {
         },
       }
     );
-    console.log("event-ride-response", response.data);
     setEventRidePopUpPanel(false);
   }
 
+  // GSAP Panels
   useGSAP(() => {
     gsap.to(ridePopUpRef.current, {
       y: ridePopUpPanel ? 0 : '100%',
@@ -218,6 +227,7 @@ function CaptainHome() {
     });
   }, [confirmRidePopUpPanel]);
 
+  // Page Layout
   return (
     <div className="h-screen overflow-hidden">
       <div className="h-[50%]">
@@ -226,7 +236,6 @@ function CaptainHome() {
       <div className="fixed bottom-0 h-[46%] w-full max-w-full overflow-y-auto overflow-x-hidden bg-white">
         <CaptainDetail setArrivedPopUpPanel={setArrivedPopUpPanel} setRide={setRide} />
       </div>
-
       <div
         ref={ridePopUpRef}
         className="fixed bottom-0 bg-white w-screen h-[48%] lg:ml-6 mb-3 translate-y-full"
@@ -239,15 +248,16 @@ function CaptainHome() {
           setConfirmRidePopUpPanel={setConfirmRidePopUpPanel}
         />
       </div>
-
-      <div ref={aproachingToPickupRef} className="h-screen fixed bottom-0 bg-white w-screen lg:ml-6 translate-y-full">
+      <div
+        ref={aproachingToPickupRef}
+        className="h-screen fixed bottom-0 bg-white w-screen lg:ml-6 translate-y-full"
+      >
         <ArrivedAtPickup
           setArrivedPopUpPanel={setArrivedPopUpPanel}
           ride={ride}
           setConfirmRidePopUpPanel={setConfirmRidePopUpPanel}
         />
       </div>
-
       <div
         ref={eventRidePopUpRef}
         className="fixed bottom-0 bg-white w-screen h-[48%] lg:ml-6 mb-8 translate-y-full"
@@ -259,9 +269,9 @@ function CaptainHome() {
           setEventConfirmRidePopUpPanel={setEventConfirmRidePopUpPanel}
         />
       </div>
-
+      {/* Optional event ride start panel */}
       {/* <div
-        ref={eventRidePopUpRef}
+        ref={startEventRidePopUpRef}
         className="fixed bottom-0 bg-white w-screen h-[48%] lg:ml-6 mb-8 translate-y-full"
       >
         <StartRide
@@ -270,7 +280,6 @@ function CaptainHome() {
           setEventConfirmRidePopUpPanel={setEventConfirmRidePopUpPanel}
         />
       </div> */}
-
       <div
         ref={confirmRidePopUpRef}
         className="h-screen fixed bottom-0 bg-white w-screen lg:ml-6 translate-y-full"
