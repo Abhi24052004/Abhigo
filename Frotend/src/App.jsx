@@ -40,6 +40,9 @@ function App() {
           <Route path="/captain/home" element={<CapatinProtectedWrapper> 
             <CaptainIssue/>
           </CapatinProtectedWrapper>}/>
+          <Route path="/captain/start" element={<CapatinProtectedWrapper> 
+            <CaptainHome />
+          </CapatinProtectedWrapper>}/>
           <Route path="/captain/logout" element={<CapatinProtectedWrapper>
             <CaptainLogout/>
           </CapatinProtectedWrapper>}/>
