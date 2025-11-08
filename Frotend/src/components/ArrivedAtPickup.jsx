@@ -13,11 +13,10 @@ function ArrivedAtPickup(props) {
   return (
     <div className="h-screen w-full flex flex-col">
       <div style={{ height: '2%' }} />
-
       <div style={MAP_CONTAINER_STYLE}>
-        <LiveTracking ride={props.ride} User={isUser} />
+        {/* explicitly target pickup on this page */}
+        <LiveTracking ride={props.ride} User={isUser} target="pickup" />
       </div>
-
       <div className="w-full bg-white p-4" style={{ height: 80 }}>
         <button onClick={handleRide} className="w-full mt-2 bg-green-500 text-lg text-white font-semibold p-3 rounded-lg text-center">
           Arrived At PickupPoint
