@@ -1,4 +1,4 @@
-import React, { useContext, useEffect, useState, useMemo } from 'react'
+import React, { useContext, useEffect, useState, useMemo, useRef, useCallback } from 'react'
 import { CaptainDataContext } from '../context/CapatainContext'
 import { SocketContext } from '../context/SocketContext'
 import axios from 'axios'
@@ -23,15 +23,10 @@ const BottomSheet = ({ open, onClose, title, children }) => {
   )
 }
 
-/* Modal for viewing single event details (updated layout per request)
-   - User + Price box at top
-   - Other info below (Date & Time, Pickup, Destination, Special Requirements)
-   - Removed top-right Close button (bottom Close remains)
-*/
+/* Modal for viewing single event details */
 const DetailModal = ({ open, onClose, event, startEvent, formatDateDMY }) => {
   if (!open || !event) return null
 
-  // Safe field extraction with fallbacks (no objects rendered directly)
   const pickup = event?.pickup ?? event?.pickupAddress ?? event?.pickup_location ?? event?.startAddress ?? 'Not provided'
   const destination = event?.destination ?? event?.dropoff ?? event?.to ?? event?.endAddress ?? 'Not provided'
 
@@ -43,13 +38,11 @@ const DetailModal = ({ open, onClose, event, startEvent, formatDateDMY }) => {
   const price = event?.fare ?? event?.price ?? event?.amount ?? event?.estimatedFare ?? null
   const specialReq = event?.specialRequest ?? event?.specialReq ?? event?.notes ?? event?.instructions ?? ''
 
-  // Use eventDateTime primarily (matches your backend sample). Try other fallbacks.
   const dateRaw = event?.eventDateTime ?? event?.date ?? event?.scheduledAt ?? event?.datetime ?? null
   const dt = dateRaw ? new Date(dateRaw) : null
   const dateStr = dt ? formatDateDMY(dt) : 'Date TBD'
   const timeStr = dt ? dt.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : 'Time TBD'
 
-  // Check if event is today
   const isEventToday = dt ? (() => {
     const now = new Date()
     return dt.getFullYear() === now.getFullYear() && dt.getMonth() === now.getMonth() && dt.getDate() === now.getDate()
@@ -59,13 +52,11 @@ const DetailModal = ({ open, onClose, event, startEvent, formatDateDMY }) => {
     <div className="fixed inset-0 z-60 flex items-center justify-center" aria-modal="true" role="dialog">
       <div className="absolute inset-0 bg-black/50" onClick={onClose} />
       <div className="relative w-full max-w-md bg-white rounded-xl shadow-xl p-5 mx-4">
-        {/* Top: Title */}
         <div className="mb-3">
           <h2 className="text-xl font-bold">Event Details</h2>
           <p className="text-sm text-gray-500 mt-1">{event?.title ?? event?.name ?? 'Event'}</p>
         </div>
 
-        {/* User + Price box at top (side-by-side) */}
         <div className="grid grid-cols-2 gap-3 items-center">
           <div className="p-3 bg-white rounded-lg shadow-sm">
             <div className="text-xs text-gray-500">User</div>
@@ -78,7 +69,6 @@ const DetailModal = ({ open, onClose, event, startEvent, formatDateDMY }) => {
           </div>
         </div>
 
-        {/* Other details below */}
         <div className="mt-4 space-y-3">
           <div className="bg-gray-50 p-3 rounded-lg">
             <div className="text-xs text-gray-500">Date & Time</div>
@@ -101,7 +91,6 @@ const DetailModal = ({ open, onClose, event, startEvent, formatDateDMY }) => {
           </div>
         </div>
 
-        {/* Bottom buttons */}
         <div className="mt-5 flex justify-end gap-3">
           {isEventToday ? (
             <>
@@ -126,40 +115,78 @@ const CaptainDetails = (props) => {
   const [sheetOpen, setSheetOpen] = useState(false)
   const [detailOpen, setDetailOpen] = useState(false)
   const [selectedEvent, setSelectedEvent] = useState({})
+  const controllerRef = useRef(null)
 
+  // fetch function (callable for retry and on-demand)
+  const fetchCaptainEvents = useCallback(async () => {
+    if (!captain?._id) return
+    // abort any previous request
+    try {
+      controllerRef.current?.abort()
+    } catch (e) {
+      // ignore
+    }
+    const controller = new AbortController()
+    controllerRef.current = controller
+
+    setLoadingEvents(true)
+    setEventsError(null)
+
+    const url = `${import.meta.env.VITE_BASE_URL}/rides/captainEvent`
+    try {
+      const res = await axios.get(url, {
+        params: { captainId: captain._id },
+        headers: { Authorization: `Bearer ${localStorage.getItem('token')}` },
+        signal: controller.signal
+      })
+
+      const payload = Array.isArray(res.data) ? res.data : (res.data ? [res.data] : [])
+      setAllEvent(payload)
+    } catch (err) {
+      // axios in modern versions throws a CanceledError when aborted (code: 'ERR_CANCELED')
+      const isCanceled = err?.code === 'ERR_CANCELED' || err?.name === 'CanceledError'
+      if (isCanceled) {
+        // request was cancelled: ignore
+        return
+      }
+      console.error('Failed fetching captain events', {
+        error: err,
+        url,
+        captainId: captain._id,
+      })
+      // Prefer backend message if present
+      const message = err?.response?.data?.message || err?.response?.data || err?.message || 'Unknown error'
+      setEventsError(`${message}`)
+      setAllEvent([])
+    } finally {
+      setLoadingEvents(false)
+    }
+  }, [captain?._id])
+
+  // initial load when captain id becomes available
   useEffect(() => {
     if (!captain?._id) return
-
-    const source = axios.CancelToken.source()
-    const fetchCaptainEvents = async () => {
+    fetchCaptainEvents()
+    return () => {
       try {
-        setLoadingEvents(true)
-        setEventsError(null)
-        const res = await axios.get(`${import.meta.env.VITE_BASE_URL}/rides/captainEvent`, {
-          params: { captainId: captain._id },
-          headers: { Authorization: `Bearer ${localStorage.getItem('token')}` }
-        })
-        const payload = Array.isArray(res.data) ? res.data : (res.data ? [res.data] : [])
-        setAllEvent(payload)
-      } catch (err) {
-        if (!axios.isCancel(err)) {
-          setEventsError(err)
-          setAllEvent([])
-        }
-      } finally {
-        setLoadingEvents(false)
+        controllerRef.current?.abort()
+      } catch (e) {
+        //
       }
     }
+  }, [captain?._id, fetchCaptainEvents])
 
-    fetchCaptainEvents()
-    return () => source.cancel()
-  }, [captain?._id])
+  // also fetch when sheet opens so user can retry and see fresh data
+  useEffect(() => {
+    if (sheetOpen) {
+      fetchCaptainEvents()
+    }
+  }, [sheetOpen, fetchCaptainEvents])
 
   // Safe name getters (captain)
   const firstName = captain?.fullname?.firstname || captain?.FullName?.FirstName || ''
   const lastName = captain?.fullname?.lastname || captain?.FullName?.LastName || ''
 
-  // helper: format date as dd/mm/yyyy with zero padding
   const formatDateDMY = (dateObj) => {
     if (!dateObj) return 'Date TBD'
     const d = dateObj.getDate().toString().padStart(2, '0')
@@ -168,7 +195,6 @@ const CaptainDetails = (props) => {
     return `${d}/${m}/${y}`
   }
 
-  // normalize & sort upcoming events ascending by date
   const upcomingEvents = useMemo(() => {
     const source = Array.isArray(allEvent) && allEvent.length > 0 ? allEvent : (captain?.events ? captain.events : (captain?.event ? [captain.event] : []))
     const normalized = source
@@ -187,10 +213,8 @@ const CaptainDetails = (props) => {
     return normalized
   }, [allEvent, captain])
 
-  // primary event = earliest (first) event if any
   const primaryEvent = useMemo(() => (upcomingEvents && upcomingEvents.length ? upcomingEvents[0] : null), [upcomingEvents])
 
-  // check whether primary event is today
   const isPrimaryEventToday = useMemo(() => {
     if (!primaryEvent) return false
     const d = primaryEvent?.eventDateTime ?? primaryEvent?.date ?? primaryEvent?.scheduledAt ?? primaryEvent?.datetime
@@ -207,7 +231,7 @@ const CaptainDetails = (props) => {
     const now = new Date()
     return upcomingEvents.some((ev) => {
       const d = ev?.eventDateTime ?? ev?.date ?? ev?.scheduledAt ?? ev?.datetime ?? null
-      if (!d) return true // unknown date -> treat as not today (showable)
+      if (!d) return true
       const evDate = new Date(d)
       return !(evDate.getFullYear() === now.getFullYear() && evDate.getMonth() === now.getMonth() && evDate.getDate() === now.getDate())
     })
@@ -221,7 +245,6 @@ const CaptainDetails = (props) => {
 
   const closeDetail = () => {
     setDetailOpen(false)
-    console.log(selectedEvent)
     setSelectedEvent(null)
   }
 
@@ -234,7 +257,6 @@ const CaptainDetails = (props) => {
         console.warn('Missing ids for startEvent', { eventId, captainId, userId })
       }
 
-      // Call backend to start event ride
       await axios.post(`${import.meta.env.VITE_BASE_URL}/rides/startEventRide`, {
         eventId,
         captainId,
@@ -243,13 +265,11 @@ const CaptainDetails = (props) => {
         headers: { Authorization: `Bearer ${localStorage.getItem('token')}` },
       })
 
-      // Update local UI state
       setDetailOpen(false)
       props.setRide(selectedEvent)
       props.setArrivedPopUpPanel(true)
       setSelectedEvent(null)
 
-      // Explicitly join event room via socket (even though auto join may also occur)
       if (socket && eventId && captainId) {
         socket.emit('join-event', { rideId: eventId, userId: captainId, userType: 'captain' })
       }
@@ -258,22 +278,6 @@ const CaptainDetails = (props) => {
     }
   }
 
-  // const startRide= async() => {
-  //   setDetailOpen(false)
-  //   setSelectedEvent(null)
-  //   await axios.post(
-  //     `${import.meta.env.VITE_BASE_URL}/rides/startEventRide`,
-  //     { eventId: selectedEvent._id ,
-  //       captainId: selectedEvent.captain._id,
-  //       userId: selectedEvent.user._id
-  //     },
-  //     {
-  //       headers: { Authorization: `Bearer ${localStorage.getItem('token')}` },
-  //     }
-  //   ) 
-  // }
-
-  // small utility to display short date (e.g., "1 Nov") -- used in lists
   const dateDisplay = (raw) => {
     if (!raw) return 'Date TBD'
     const d = new Date(raw)
@@ -282,7 +286,6 @@ const CaptainDetails = (props) => {
 
   return (
     <div className="p-4 w-full max-w-full overflow-x-hidden">
-      {/* Top row: avatar + name and earned */}
       <div className="flex items-center justify-between mb-4">
         <div className="flex items-center gap-3 min-w-0">
           <div className="relative flex-shrink-0">
@@ -307,7 +310,6 @@ const CaptainDetails = (props) => {
         </div>
       </div>
 
-      {/* Stats card */}
       <div className="flex gap-4 p-3 bg-gradient-to-r from-white to-gray-50 rounded-xl shadow-inner items-start overflow-hidden">
         <div className="flex-1 grid grid-cols-3 gap-2 text-center min-w-0">
           <div className="bg-white/60 p-3 rounded-lg shadow-sm">
@@ -328,10 +330,8 @@ const CaptainDetails = (props) => {
         </div>
       </div>
 
-      {/* Primary banner (only if today's event exists) */}
       {bannerEvent ? (
         <div className="mt-4">
-          {/* Attention badge at top */}
           <div className="flex items-center gap-2 mb-2 animate-bounce">
             <div className="w-2 h-2 bg-red-500 rounded-full animate-pulse"></div>
             <span className="text-sm font-semibold text-red-600">⚠️ You have an event TODAY!</span>
@@ -384,12 +384,20 @@ const CaptainDetails = (props) => {
         </div>
       )}
 
-      {/* Bottom sheet (mobile) */}
       <BottomSheet open={sheetOpen} onClose={() => setSheetOpen(false)} title="Upcoming Events">
         {loadingEvents ? (
           <div className="p-3 rounded-lg bg-white/60 text-sm text-gray-600">Loading events...</div>
         ) : eventsError ? (
-          <div className="p-3 rounded-lg bg-rose-50 text-sm text-rose-700">Error loading events</div>
+          <div className="p-3 space-y-3">
+            <div className="rounded-lg bg-rose-50 p-3 text-sm text-rose-700">
+              Error loading events: {eventsError}
+            </div>
+            <div className="flex gap-2">
+              <button onClick={() => fetchCaptainEvents()} className="px-3 py-2 bg-amber-300 rounded-md font-semibold">Retry</button>
+              <button onClick={() => { setSheetOpen(false); }} className="px-3 py-2 bg-white border rounded-md">Close</button>
+            </div>
+            <div className="text-xs text-gray-500 mt-2">Open DevTools → Network to inspect the request URL and response.</div>
+          </div>
         ) : upcomingEvents.length === 0 ? (
           <div className="p-3 rounded-lg bg-white/60 text-sm text-gray-600">No upcoming events.</div>
         ) : (
@@ -409,7 +417,6 @@ const CaptainDetails = (props) => {
                     </div>
                     <div className="flex flex-col items-end gap-2 ml-4">
                       <button onClick={() => openDetail(ev)} className="px-3 py-1.5 bg-amber-50 text-amber-700 rounded-md text-sm font-medium shadow-sm hover:brightness-105">View</button>
-                      {/* <div className="text-xs text-gray-400 mt-1">{dateRaw ? formatDateDMY(new Date(dateRaw)) : 'Date TBD'}</div> */}
                     </div>
                   </div>
                 </div>
@@ -419,7 +426,6 @@ const CaptainDetails = (props) => {
         )}
       </BottomSheet>
 
-      {/* Detail modal */}
       <DetailModal open={detailOpen} onClose={closeDetail} event={selectedEvent} startEvent={startEvent} formatDateDMY={formatDateDMY} />
     </div>
   )
