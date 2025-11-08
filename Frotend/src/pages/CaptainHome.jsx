@@ -64,12 +64,14 @@ function CaptainHome() {
     updateLocation();
 
     return () => clearInterval(locationInterval);
-  }, [captain, socket]);
+  }, [captain]);
+
+
 
   useEffect(() => {
     const onNewRide = (data) => {
       const cap = captainRef.current;
-      console.log('new-ride received', { data, captainVehicle: cap?.vehicle?.vehicleType });
+  console.log('new-ride received', { data, captainVehicle: cap?.vehicle?.vehicleType });
       if (!cap) {
         console.log('Captain not ready yet; ignoring this new-ride for now');
         return;
@@ -121,11 +123,11 @@ function CaptainHome() {
     return () => socket.off('ride-claimed', onRideClaimed);
   }, [socket, ride, eventRide]);
 
+
+
+
   async function confirmRide() {
-    if (!ride) {
-      console.warn('confirmRide called but ride is missing');
-      return;
-    }
+    if (!ride) return;
 
     console.log('confirm-ride-called');
 
@@ -147,10 +149,7 @@ function CaptainHome() {
   }
 
   async function confirmEventRide() {
-    if (!eventRide) {
-      console.warn('confirmEventRide called but eventRide is missing');
-      return;
-    }
+    if (!eventRide) return;
 
     console.log('confirm-event-ride-called');
 
@@ -232,56 +231,55 @@ function CaptainHome() {
         ref={ridePopUpRef}
         className="fixed bottom-0 bg-white w-screen h-[48%] lg:ml-6 mb-3 translate-y-full"
       >
-        {/* Only render RidePopUp when ride data exists */}
-        {ride ? (
-          <RidePopUp
-            setRidePopUpPanel={setRidePopUpPanel}
-            ride={ride}
-            confirmRide={confirmRide}
-            setArrivedPopUpPanel={setArrivedPopUpPanel}
-            setConfirmRidePopUpPanel={setConfirmRidePopUpPanel}
-          />
-        ) : null}
+        <RidePopUp
+          setRidePopUpPanel={setRidePopUpPanel}
+          ride={ride}
+          confirmRide={confirmRide}
+          setArrivedPopUpPanel={setArrivedPopUpPanel}
+          setConfirmRidePopUpPanel={setConfirmRidePopUpPanel}
+        />
       </div>
 
       <div ref={aproachingToPickupRef} className="h-screen fixed bottom-0 bg-white w-screen lg:ml-6 translate-y-full">
-        {/* Only render ArrivedAtPickup when ride exists */}
-        {ride ? (
-          <ArrivedAtPickup
-            setArrivedPopUpPanel={setArrivedPopUpPanel}
-            ride={ride}
-            setConfirmRidePopUpPanel={setConfirmRidePopUpPanel}
-          />
-        ) : null}
+        <ArrivedAtPickup
+          setArrivedPopUpPanel={setArrivedPopUpPanel}
+          ride={ride}
+          setConfirmRidePopUpPanel={setConfirmRidePopUpPanel}
+        />
       </div>
 
       <div
         ref={eventRidePopUpRef}
         className="fixed bottom-0 bg-white w-screen h-[48%] lg:ml-6 mb-8 translate-y-full"
       >
-        {/* Only render EventRidePopUp when eventRide data exists */}
-        {eventRide ? (
-          <EventRidePopUp
-            setEventRidePopUpPanel={setEventRidePopUpPanel}
-            ride={eventRide}
-            confirmEventRide={confirmEventRide}
-            setEventConfirmRidePopUpPanel={setEventConfirmRidePopUpPanel}
-          />
-        ) : null}
+        <EventRidePopUp
+          setEventRidePopUpPanel={setEventRidePopUpPanel}
+          ride={eventRide}
+          confirmEventRide={confirmEventRide}
+          setEventConfirmRidePopUpPanel={setEventConfirmRidePopUpPanel}
+        />
       </div>
+
+      {/* <div
+        ref={eventRidePopUpRef}
+        className="fixed bottom-0 bg-white w-screen h-[48%] lg:ml-6 mb-8 translate-y-full"
+      >
+        <StartRide
+          setEventRidePopUpPanel={setStartEventRidePopUpPanel}
+          ride={eventRide}
+          setEventConfirmRidePopUpPanel={setEventConfirmRidePopUpPanel}
+        />
+      </div> */}
 
       <div
         ref={confirmRidePopUpRef}
         className="h-screen fixed bottom-0 bg-white w-screen lg:ml-6 translate-y-full"
       >
-        {/* Confirm popup only when ride exists */}
-        {ride ? (
-          <ConfirmRidePopUp
-            setConfirmRidePopUpPanel={setConfirmRidePopUpPanel}
-            ride={ride}
-            setRidePopUpPanel={setRidePopUpPanel}
-          />
-        ) : null}
+        <ConfirmRidePopUp
+          setConfirmRidePopUpPanel={setConfirmRidePopUpPanel}
+          ride={ride}
+          setRidePopUpPanel={setRidePopUpPanel}
+        />
       </div>
     </div>
   );
