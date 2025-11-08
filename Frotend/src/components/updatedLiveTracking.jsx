@@ -4,65 +4,40 @@ import { SocketContext } from '../context/SocketContext'
 
 const containerStyle = {
   width: '100%',
-  height: '100%', // parent must provide explicit height (ArrivedAtPickup now does)
+  height: '100%' // parent must supply explicit pixel height
 }
 
-const defaultCenter = {
-  lat: 22.570, // fallback center (you can change)
-  lng: 72.930
-}
+const defaultCenter = { lat: 22.570, lng: 72.930 }
 
 const LiveTracking = ({ ride, User }) => {
+  // prefer build-time env, fallback to runtime injected config if you use runtime-config.js
+  const apiKey = import.meta.env.VITE_GOOGLE_MAPS_API_KEY || (typeof window !== 'undefined' && window.__RUNTIME_CONFIG__?.VITE_GOOGLE_MAPS_API_KEY) || ''
+
   const { socket } = useContext(SocketContext) || {}
 
-  const [currentPosition, setCurrentPosition] = useState(null)
-  const [captainPosition, setCaptainPosition] = useState(null)
+  const [currentPosition, setCurrentPosition] = useState(null) // device geolocation
+  const [captainPosition, setCaptainPosition] = useState(null) // from ride or socket
   const [pickupPosition, setPickupPosition] = useState(null)
   const [directions, setDirections] = useState(null)
 
   const mapRef = useRef(null)
   const watchIdRef = useRef(null)
   const lastUpdateRef = useRef(0)
-  const followCaptainRef = useRef(true) // keep map centered on first location, can be toggled
+  const followRef = useRef(true) // initial follow behavior; change via UI later if desired
 
-  // get current position (throttled & distance guarded to reduce jitter)
-  useEffect(() => {
-    if (!('geolocation' in navigator)) return
-    const onSuccess = (position) => {
-      const newPos = { lat: position.coords.latitude, lng: position.coords.longitude }
+  // If API key missing, show a friendly error instead of "Loading..."
+  if (!apiKey) {
+    return (
+      <div className="h-full w-full flex items-center justify-center bg-gray-50 text-center p-4">
+        <div>
+          <div className="text-lg font-semibold text-rose-600">Google Maps API key missing</div>
+          <div className="text-sm text-gray-600 mt-2">Set VITE_GOOGLE_MAPS_API_KEY at build time or provide window.__RUNTIME_CONFIG__.VITE_GOOGLE_MAPS_API_KEY</div>
+        </div>
+      </div>
+    )
+  }
 
-      // Throttle to once every 1500 ms (adjust as needed)
-      const now = Date.now()
-      const last = lastUpdateRef.current || 0
-      const dt = now - last
-      const moved = distanceMeters(currentPosition, newPos)
-
-      if (dt > 1500 || moved > 5 || !currentPosition) {
-        lastUpdateRef.current = now
-        setCurrentPosition(newPos)
-        // optionally pan only the first time or when following
-        if (mapRef.current && followCaptainRef.current) {
-          try {
-            mapRef.current.panTo(newPos)
-          } catch (e) {
-            // ignore pan errors
-          }
-        }
-      }
-    }
-    const onError = (err) => console.error('geolocation error', err)
-    navigator.geolocation.getCurrentPosition(onSuccess, onError, { enableHighAccuracy: true })
-    watchIdRef.current = navigator.geolocation.watchPosition(onSuccess, onError, {
-      enableHighAccuracy: true,
-      maximumAge: 1000,
-      timeout: 5000
-    })
-    return () => {
-      if (watchIdRef.current != null) navigator.geolocation.clearWatch(watchIdRef.current)
-    }
-  }, [currentPosition])
-
-  // helper: compute rough distance (meters) between two lat/lng points
+  // helper: rough distance (meters)
   function distanceMeters(a, b) {
     if (!a || !b) return Infinity
     const R = 6371000
@@ -79,11 +54,38 @@ const LiveTracking = ({ ride, User }) => {
     return R * c
   }
 
-  // Set captain position and geocode pickup when ride changes
+  // device geolocation (throttled)
+  useEffect(() => {
+    if (!('geolocation' in navigator)) return
+    const onSuccess = (position) => {
+      const newPos = { lat: position.coords.latitude, lng: position.coords.longitude }
+      const now = Date.now()
+      const last = lastUpdateRef.current || 0
+      const moved = distanceMeters(currentPosition, newPos)
+      if (now - last > 1500 || moved > 5 || !currentPosition) {
+        lastUpdateRef.current = now
+        setCurrentPosition(newPos)
+        if (mapRef.current && followRef.current) {
+          try { mapRef.current.panTo(newPos) } catch (e) {}
+        }
+      }
+    }
+    const onError = (err) => console.error('geolocation error', err)
+    navigator.geolocation.getCurrentPosition(onSuccess, onError, { enableHighAccuracy: true })
+    watchIdRef.current = navigator.geolocation.watchPosition(onSuccess, onError, {
+      enableHighAccuracy: true,
+      maximumAge: 1000,
+      timeout: 5000
+    })
+    return () => { if (watchIdRef.current != null) navigator.geolocation.clearWatch(watchIdRef.current) }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
+  // when ride arrives, set captain position (if included) and geocode pickup
   useEffect(() => {
     if (!ride) return
 
-    // Captain location may be present in different keys
+    // pick up captain location from ride if present
     const loc = ride.captain?.location || {}
     const lat = loc?.lat ?? loc?.ltd ?? loc?.latitude ?? null
     const lng = loc?.lng ?? loc?.longitude ?? null
@@ -92,28 +94,24 @@ const LiveTracking = ({ ride, User }) => {
       const parsedLng = Number(lng)
       if (!Number.isNaN(parsedLat) && !Number.isNaN(parsedLng)) {
         setCaptainPosition({ lat: parsedLat, lng: parsedLng })
-        console.log('[LiveTracking] setCaptainPosition from ride', { parsedLat, parsedLng })
-        // pan to captain once on receiving ride update (if following enabled)
-        if (mapRef.current && followCaptainRef.current) {
-          try {
-            mapRef.current.panTo({ lat: parsedLat, lng: parsedLng })
-          } catch (e) {}
+        if (mapRef.current && followRef.current) {
+          try { mapRef.current.panTo({ lat: parsedLat, lng: parsedLng }) } catch (e) {}
         }
       }
     } else {
-      console.log('[LiveTracking] no captain location found on ride', ride._id)
+      // fallback: if ride doesn't include captain location, rely on device geolocation (currentPosition)
+      console.debug('[LiveTracking] ride has no captain.location — falling back to device geolocation')
     }
 
-    // pickup geocode (if textual address exists)
+    // geocode pickup address if provided
     const geocodePickup = async () => {
       if (!ride.pickup || !window.google?.maps) return
       try {
         const geocoder = new window.google.maps.Geocoder()
         geocoder.geocode({ address: ride.pickup }, (results, status) => {
           if (status === 'OK' && results[0]) {
-            const loc = results[0].geometry.location
-            setPickupPosition({ lat: loc.lat(), lng: loc.lng() })
-            console.log('[LiveTracking] pickup geocoded', { lat: loc.lat(), lng: loc.lng() })
+            const loc2 = results[0].geometry.location
+            setPickupPosition({ lat: loc2.lat(), lng: loc2.lng() })
           } else {
             console.warn('[LiveTracking] pickup geocode failed', status)
             setPickupPosition(null)
@@ -126,14 +124,14 @@ const LiveTracking = ({ ride, User }) => {
     geocodePickup()
   }, [ride])
 
-  // Directions: compute route from origin to pickup when pickup position exists
+  // compute directions when pickupPosition and an origin are available
   useEffect(() => {
     if (!pickupPosition || !window.google?.maps) return
-    const origin = User ? captainPosition || currentPosition : currentPosition || captainPosition
-    if (!origin) {
-      console.log('[LiveTracking] no origin available for directions', { User, captainPosition, currentPosition })
-      return
-    }
+
+    // origin precedence: if User flag (viewing as user) use captainPosition, else prefer device currentPosition
+    const origin = User ? (captainPosition || currentPosition) : (currentPosition || captainPosition)
+    if (!origin) return
+
     const service = new window.google.maps.DirectionsService()
     service.route(
       {
@@ -144,7 +142,6 @@ const LiveTracking = ({ ride, User }) => {
       (result, status) => {
         if (status === 'OK') {
           setDirections(result)
-          console.log('[LiveTracking] directions received')
         } else {
           console.error('[LiveTracking] Directions error', status)
         }
@@ -152,7 +149,7 @@ const LiveTracking = ({ ride, User }) => {
     )
   }, [pickupPosition, captainPosition, currentPosition, User])
 
-  // Socket updates for captain location
+  // socket updates for captain; update marker but throttle+panning rules keep map steady
   useEffect(() => {
     if (!socket) return
     const handler = (payload) => {
@@ -161,17 +158,14 @@ const LiveTracking = ({ ride, User }) => {
       const lng = payload.location?.lng ?? payload.location?.longitude
       if (lat != null && lng != null) {
         const newPos = { lat: Number(lat), lng: Number(lng) }
-        // Avoid jitter by only updating if moved > 5 meters or more than 1500ms passed
         const now = Date.now()
         const last = lastUpdateRef.current || 0
         const moved = distanceMeters(captainPosition, newPos)
         if (moved > 5 || now - last > 1500 || !captainPosition) {
           lastUpdateRef.current = now
           setCaptainPosition(newPos)
-          if (mapRef.current && followCaptainRef.current) {
-            try {
-              mapRef.current.panTo(newPos)
-            } catch (e) {}
+          if (mapRef.current && followRef.current) {
+            try { mapRef.current.panTo(newPos) } catch (e) {}
           }
         }
       }
@@ -182,18 +176,12 @@ const LiveTracking = ({ ride, User }) => {
 
   const handleMapLoad = (map) => {
     mapRef.current = map
-    // On load, if we already have a position, center map there
-    const initial = captainPosition || currentPosition
+    const initial = captainPosition || currentPosition || defaultCenter
     if (initial && map.panTo) {
-      setTimeout(() => {
-        try {
-          map.panTo(initial)
-        } catch (e) {}
-      }, 0)
+      setTimeout(() => { try { map.panTo(initial) } catch (e) {} }, 0)
     }
   }
 
-  // small colored pin as SVG icon
   const makePinIcon = (colorHex) => {
     const svg = `
       <svg xmlns='http://www.w3.org/2000/svg' width='64' height='64' viewBox='0 0 64 64'>
@@ -202,11 +190,7 @@ const LiveTracking = ({ ride, User }) => {
       </svg>`
     const url = 'data:image/svg+xml;charset=UTF-8,' + encodeURIComponent(svg)
     if (window.google && window.google.maps && window.google.maps.Size && window.google.maps.Point) {
-      return {
-        url,
-        scaledSize: new window.google.maps.Size(44, 44),
-        anchor: new window.google.maps.Point(22, 44)
-      }
+      return { url, scaledSize: new window.google.maps.Size(44, 44), anchor: new window.google.maps.Point(22, 44) }
     }
     return { url }
   }
@@ -214,76 +198,46 @@ const LiveTracking = ({ ride, User }) => {
   const captainIcon = useMemo(() => makePinIcon('#27ae60'), [])
   const pickupIcon = useMemo(() => makePinIcon('#e74c3c'), [])
 
-  const renderOverlayLabel = (position, text, bgColor) => {
-    return (
-      <OverlayView
-        position={position}
-        mapPaneName={OverlayView.OVERLAY_MOUSE_TARGET}
-        getPixelPositionOffset={(width, height) => ({ x: -width / 2, y: -height - 18 })}
-      >
-        <div style={{
-          display: 'flex',
-          alignItems: 'center',
-          gap: 8,
-          pointerEvents: 'none',
-          transform: 'translateZ(0)',
-          zIndex: 9999
-        }}>
-          <span style={{
-            width: 10,
-            height: 10,
-            borderRadius: 6,
-            background: bgColor,
-            boxShadow: '0 2px 6px rgba(0,0,0,0.35)',
-            flex: '0 0 10px'
-          }} />
-          <div style={{
-            padding: '6px 10px',
-            borderRadius: 8,
-            background: 'rgba(0,0,0,0.65)',
-            color: '#fff',
-            fontWeight: 800,
-            fontSize: 13,
-            whiteSpace: 'nowrap'
-          }}>
-            {text}
-          </div>
+  const renderOverlayLabel = (position, text, bgColor) => (
+    <OverlayView
+      position={position}
+      mapPaneName={OverlayView.OVERLAY_MOUSE_TARGET}
+      getPixelPositionOffset={(width, height) => ({ x: -width / 2, y: -height - 18 })}
+    >
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8, pointerEvents: 'none', transform: 'translateZ(0)', zIndex: 9999 }}>
+        <span style={{ width: 10, height: 10, borderRadius: 6, background: bgColor, boxShadow: '0 2px 6px rgba(0,0,0,0.35)' }} />
+        <div style={{ padding: '6px 10px', borderRadius: 8, background: 'rgba(0,0,0,0.65)', color: '#fff', fontWeight: 800, fontSize: 13, whiteSpace: 'nowrap' }}>
+          {text}
         </div>
-      </OverlayView>
-    )
-  }
+      </div>
+    </OverlayView>
+  )
 
   return (
-    <LoadScript googleMapsApiKey={import.meta.env.VITE_GOOGLE_MAPS_API_KEY}>
+    <LoadScript googleMapsApiKey={apiKey}>
       <GoogleMap
         mapContainerStyle={containerStyle}
-        center={defaultCenter} // keep stable; pan programmatically instead of updating center prop constantly
+        center={defaultCenter}
         zoom={15}
         onLoad={handleMapLoad}
         options={{ zoomControl: false, fullscreenControl: false, streetViewControl: false, mapTypeControl: false }}
       >
-        {/* Markers and overlays */}
         {pickupPosition && <Marker position={pickupPosition} zIndex={2} icon={pickupIcon} title="Pickup" />}
+        {/* show device position (always available if user gave geolocation permission) */}
+        {currentPosition && (
+          <Marker position={currentPosition} zIndex={6} icon={captainIcon} title="You" />
+        )}
 
-        {/* Show captain marker at captainPosition if present */}
-        {captainPosition && !User && (
-          <Marker position={captainPosition} zIndex={5} icon={captainIcon} title="Captain" />
-        )}
-        {currentPosition && !User && (
-          <Marker position={currentPosition} zIndex={5} icon={captainIcon} title="You" />
-        )}
-        {captainPosition && User && (
+        {/* show captainPosition (from ride or socket) */}
+        {captainPosition && (
           <Marker position={captainPosition} zIndex={5} icon={captainIcon} title="Captain" />
         )}
 
         {pickupPosition && renderOverlayLabel(pickupPosition, 'Pickup', '#e74c3c')}
-        {captainPosition && User && renderOverlayLabel(captainPosition, 'Captain', '#27ae60')}
-        {currentPosition && !User && renderOverlayLabel(currentPosition, 'You', '#27ae60')}
+        {captainPosition && renderOverlayLabel(captainPosition, 'Captain', '#27ae60')}
+        {currentPosition && renderOverlayLabel(currentPosition, 'You', '#27ae60')}
 
-        {/* DirectionsRenderer: preserveViewport so it doesn't forcibly change center/zoom */}
-        {directions && (
-          <DirectionsRenderer directions={directions} options={{ suppressMarkers: true, preserveViewport: true }} />
-        )}
+        {directions && <DirectionsRenderer directions={directions} options={{ suppressMarkers: true, preserveViewport: true }} />}
       </GoogleMap>
     </LoadScript>
   )
