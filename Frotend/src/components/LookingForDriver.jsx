@@ -5,7 +5,6 @@ const VEHICLE_IMAGES = {
     moto: 'https://shorturl.at/5zCIa',
     auto: 'https://shorturl.at/B2YCj',
 };
-
 const LookingForDriver = (props) => {
     const vehicle = props?.vehicleType || 'car';
     const link = VEHICLE_IMAGES[vehicle] || VEHICLE_IMAGES.car;
