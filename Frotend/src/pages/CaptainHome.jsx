@@ -38,7 +38,7 @@ function CaptainHome() {
   }, [captain]);
 
   useEffect(() => {
-    if (!captain) return;
+    if (!captain) return <div>Loading...</div>;
 
     socket.emit('join', {
       userId: captain._id,
