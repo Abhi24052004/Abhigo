@@ -7,16 +7,11 @@ const authMiddleware = require('../middlewares/authMidlleware');
 
 router.post('/create',
     authMiddleware.authUser,
-    body('pickup').isString().isLength({ min: 3 }).withMessage('Invalid pickup address'),
-    body('destination').isString().isLength({ min: 3 }).withMessage('Invalid destination address'),
-    body('vehicleType').isString().isIn([ 'auto', 'car', 'moto' ]).withMessage('Invalid vehicle type'),
     rideController.createRide
 )
 
 router.get('/get-fare',
     authMiddleware.authUser,
-    query('pickup').isString().isLength({ min: 3 }).withMessage('Invalid pickup address'),
-    query('destination').isString().isLength({ min: 3 }).withMessage('Invalid destination address'),
     rideController.getFare
 )
 
@@ -28,8 +23,7 @@ router.post('/confirm',
 
 router.get('/start-ride',
     authMiddleware.authCaptain,
-    query('rideId').isMongoId().withMessage('Invalid ride id'),
-    query('otp').isString().isLength({ min: 6, max: 6 }).withMessage('Invalid OTP'),
+    
     rideController.startRide
 )
 
@@ -39,6 +33,19 @@ router.post('/end-ride',
     rideController.endRide
 )
 
+router.get('/captainEvent',
+    authMiddleware.authCaptain,
+    rideController.getAllCaptainEvents
+)
 
+router.get('/userRides',
+    authMiddleware.authUser,
+    rideController.getAllUserRides
+)
+
+router.post('/startEventRide',
+    authMiddleware.authCaptain,
+    rideController.startEventRide
+)
 
 module.exports = router;
