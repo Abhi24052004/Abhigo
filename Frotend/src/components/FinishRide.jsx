@@ -37,7 +37,7 @@ const FinishRide = (props) => {
                     <img className='h-12 rounded-full object-cover w-12' src="https://shorturl.at/54cnd" alt="" />
                     <h2 className='text-lg font-medium'>{props.ride?.user.FullName.FirstName}</h2>
                 </div>
-                <h5 className='text-lg font-semibold'>2.2 KM</h5>
+                <h5 className='text-lg font-semibold'></h5>
             </div>
             <div className='flex gap-2 justify-between flex-col items-center'>
                 <div className='w-full mt-5'>
