@@ -63,3 +63,29 @@ module.exports.logoutCaptain=async(req,res,next)=>{
     res.clearCookie('token');
     res.status(200).json({message:"Logout successfully"});
 }
+
+module.exports.findByEmail = async (req, res, next) => {
+    try {
+        const email = req.query.email || req.query.Email;
+        if (!email) return res.status(400).json({ message: 'email query required' });
+        const captain = await captainService.getCaptainByEmail(email);
+        if (!captain) return res.status(404).json({ message: 'No user exists with this email' });
+        const payload = { _id: captain._id, email: captain.email, fullname: captain.fullname };
+        return res.status(200).json(payload);
+    } catch (err) {
+        return res.status(400).json({ message: err.message });
+    }
+}
+
+module.exports.updatePassword = async (req, res, next) => {
+    try {
+        const { captainId, password } = req.body || {};
+        if (!captainId || !password) return res.status(400).json({ message: 'captainId and password required' });
+        const hashed = await captainModel.hashPassword(password);
+        const captain = await captainService.updateCaptainPassword({ captainId, hashedPassword: hashed });
+        if (!captain) return res.status(404).json({ message: 'Captain not found' });
+        return res.status(200).json({ message: 'Password updated' });
+    } catch (err) {
+        return res.status(400).json({ message: err.message });
+    }
+}
