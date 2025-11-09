@@ -131,13 +131,14 @@ export default function Home() {
   const submitHandler = (e) => { e.preventDefault(); }
 
   const { socket } = useContext(SocketContext)
-  const { user } = useContext(UserDataContext)
+  const { user, setUser } = useContext(UserDataContext)
 
   const [allRides, setAllRides] = useState([]);
   const [selectedRide, setSelectedRide] = useState(null);
+  // Prevent duplicate event emails when socket listeners are attached multiple times or server re-emits
+  const notifiedEventIdsRef = useRef(new Set());
 
   useEffect(() => {
-    console.log("WELCOM2");
     if (!user) return;
     socket.emit("join", { userType: "user", userId: user._id })
     async function getRides() {
@@ -186,39 +187,106 @@ export default function Home() {
     }
   }
 
-  socket.on('ride-confirmed', async (ride) => {
-    setRide(ride)
+  // Register socket listeners with cleanup; guard against duplicate event emails
+  useEffect(() => {
+    if (!socket) return;
 
-    if (!ride.eventDateTime) {
+    const onRideConfirmed = async (ride) => {
+      setRide(ride);
+      if (!ride?.eventDateTime) {
+        setVehicleFound(false);
+        setDriverPanel(true);
+        return;
+      }
 
-      setVehicleFound(false)
-      setDriverPanel(true)
-    }
-    else {
+      // Only send email once per event ride id
+      if (ride?._id && notifiedEventIdsRef.current.has(String(ride._id))) return;
+      if (ride?._id) notifiedEventIdsRef.current.add(String(ride._id));
 
-      setConfirmEventRidePanel(false)
-      setEventVehiclePanel(false)
-      // await axios.get("https://hooks.zapier.com/hooks/catch/25033038/ur4nxuu",
-      //   {
-      //     params: { to:ride.captain.email, msg:`You have a new event ride scheduled on ${new Date(ride.eventDateTime).toLocaleString()}. Pickup: ${ride.pickup}, Destination: ${ride.destination}. Please be on time.` },
-      //     headers: {
-      //       Authorization: `Bearer ${localStorage.getItem('token')}`
-      //     }
-      //   })
-    }
-  })
+      setConfirmEventRidePanel(false);
+      setEventVehiclePanel(false);
 
-  socket.on('event-ride-started', ride => {
-    console.log("event-ride-confirmed-socket", ride);
-    setRide(ride)
-    // For event rides: do NOT show Driver panel on user side
-    setDriverPanel(true)
-  })
+      // Build a rich, dynamic email subject & body for the event ride confirmation
+      const pickupLoc = ride.eventPickup || ride.pickup || 'Pickup TBD';
+      const destLoc = ride.eventDestination || ride.destination || 'Destination TBD';
+      const eventDate = ride.eventDateTime ? new Date(ride.eventDateTime) : null;
+      const formattedDate = eventDate ? eventDate.toLocaleString(undefined, {
+        weekday: 'short', year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit'
+      }) : 'Date/Time TBD';
+      const shortId = ride._id ? String(ride._id).slice(-6).toUpperCase() : Math.random().toString(36).slice(2, 8).toUpperCase();
+      const captainName = ride.captain?.fullname?.firstname && ride.captain?.fullname?.lastname
+        ? `${ride.captain.fullname.firstname} ${ride.captain.fullname.lastname}`
+        : (ride.captain?.name || ride.captain?.fullName || 'Assigned Soon');
+      const vehicleLabel = ride?.captain?.vehicle?.vehicleType || ride?.vehicle || 'Vehicle TBD';
+      const estFare = ride.fare || '—';
+      const currency = '₹'; // Adjust if multi-currency support needed
+      const specialReq = ride.specialRequest || '';
+      const userMail = (ride.user?.Email || ride.user?.email || user?.Email || user?.email || '').trim();
 
-  socket.on('ride-started', ride => {
-    setDriverPanel(false)
-    navigate('/riding', { state: { ride } })
-  })
+      const subject = ` Event Ride Confirmed on ${formattedDate} with Ref #${shortId}`;
+      const msgLines = [
+        '╔══════════════════════════════════════════════════════════╗',
+        '                     🎉 EVENT RIDE CONFIRMED 🎉',
+        '╚══════════════════════════════════════════════════════════╝',
+        ``,
+        `📌 Booking Reference: #${shortId}`,
+        `\n`,
+        `📅 RIDE DETAILS`,
+        `🕒 Date & Time: ${formattedDate}`,
+        `📍 Pickup: ${pickupLoc}`,
+        `🎯 Destination: ${destLoc}`,
+        `\n`,
+        `🚗 SERVICE INFORMATION`,
+        `🚙 Vehicle Type: ${vehicleLabel}`,
+        `👤 Captain: ${captainName}`,
+        `💰 Estimated Fare: ${currency}${estFare}`,
+        specialReq ? `✨ Special Request: ${specialReq}` : null,
+        `\n`,
+        `🎈 Wishing you a wonderful event!`,
+        `Thank you for choosing our service.`,
+        `\n`,
+        `Warm regards,`,
+        `🚗 Your Ride Team`,
+        ``,
+        `📞 Need help? Our support team is available 24/7.`
+      ].filter(Boolean);
+
+      const msg = msgLines.join('\n');
+
+      if (userMail) {
+        try {
+          await axios.get('https://cloud.automatisch.io/webhooks/flows/d4d752f6-d7bb-4e6a-bfaa-e7a751961eed/sync', {
+            params: { To: userMail, Subject: subject, Msg: msg }
+          });
+        } catch (e) {
+          console.error('Failed sending event confirmation email:', e?.response?.data || e.message);
+        }
+      } else {
+        console.warn('No user email available to send event confirmation.');
+      }
+    };
+
+    const onEventRideStarted = (ride) => {
+      // For event rides: show driver panel
+      setRide(ride);
+      setDriverPanel(true);
+    };
+
+    const onRideStarted = (ride) => {
+      setDriverPanel(false);
+      navigate('/riding', { state: { ride } });
+    };
+
+    socket.on('ride-confirmed', onRideConfirmed);
+    socket.on('event-ride-started', onEventRideStarted);
+    socket.on('ride-started', onRideStarted);
+
+    return () => {
+      socket.off('ride-confirmed', onRideConfirmed);
+      socket.off('event-ride-started', onEventRideStarted);
+      socket.off('ride-started', onRideStarted);
+    };
+  }, [socket, navigate, user]);
 
   const handleDestinationChange = async (e) => {
     setDestination(e.target.value)
@@ -385,16 +453,6 @@ export default function Home() {
     }
   }, [eventVehiclePanel])
 
-  // Normalize fare for LookingForDriver to avoid undefined indexing in production
-  const normalizedFare = React.useMemo(() => {
-    if (typeof fare === 'number') {
-      const key = vehicleType || 'car';
-      return { [key]: fare };
-    }
-    if (fare && typeof fare === 'object') return fare;
-    return {};
-  }, [fare, vehicleType]);
-
   useGSAP(function () {
     if (panelOpen) {
       gsap.to(panelRef.current, {
@@ -547,32 +605,7 @@ export default function Home() {
 
         <div className="min-h-[180px]">
           {userTab === 'info' && (
-            <div>
-              <h4 className="font-semibold mb-2">Account details</h4>
-              <div className="grid grid-cols-2 gap-3 text-sm text-gray-700">
-                <div>
-                  <div className="text-xs text-gray-400">Full name</div>
-                  <div>{getUserDisplayName(user) || '-'}</div>
-                </div>
-                <div>
-                  {/* <div className="text-xs text-gray-400">Phone</div>
-                  <div>{user?.phone ?? '-'}</div> */}
-                </div>
-                <div>
-                  <div className="text-xs text-gray-400">Email</div>
-                  <div>{user?.Email ?? user?.email ?? '-'}</div>
-                </div>
-                <div>
-                  {/* <div className="text-xs text-gray-400">Joined</div>
-                  <div>{user?.createdAt ? new Date(user.createdAt).toLocaleDateString() : '-'}</div> */}
-                </div>
-              </div>
-
-              <div className="mt-4 flex gap-2">
-                <button className="flex-1 bg-green-600 text-white py-2 rounded-lg">Edit Profile</button>
-                <button className="flex-1 bg-red-500 text-white py-2 rounded-lg" onClick={() => { navigate('/user/logout'); }}>Logout</button>
-              </div>
-            </div>
+            <ProfilePanel user={user} setUser={setUser} navigate={navigate} />
           )}
 
           {userTab === 'book' && (
@@ -648,7 +681,7 @@ export default function Home() {
       </div>
 
       <div ref={vehicleFoundRef} className='fixed w-full z-10 bottom-0 translate-y-full bg-white px-3 py-6 pt-12'>
-        <LookingForDriver createRide={createRide} pickup={pickup} destination={destination} fare={normalizedFare} vehicleType={vehicleType} setVehicleFound={setVehicleFound} />
+        <LookingForDriver createRide={createRide} pickup={pickup} destination={destination} fare={fare} vehicleType={vehicleType} setVehicleFound={setVehicleFound} />
       </div>
 
       <div ref={driverPanelRef} className='fixed w-full  z-10 bottom-0  bg-white px-3 py-6 pt-12'>
@@ -656,4 +689,88 @@ export default function Home() {
       </div>
     </div>
   )
+}
+
+function ProfilePanel({ user, setUser, navigate }) {
+  const [editing, setEditing] = React.useState(false);
+  const [firstName, setFirstName] = React.useState('');
+  const [lastName, setLastName] = React.useState('');
+  const [email, setEmail] = React.useState('');
+  const [saving, setSaving] = React.useState(false);
+
+  React.useEffect(() => {
+    if (!user) return;
+    const fnObj = user.FullName || user.fullName || user.Fullname || {};
+    setFirstName(fnObj.FirstName ?? fnObj.firstname ?? fnObj.first ?? '');
+    setLastName(fnObj.LastName ?? fnObj.lastname ?? fnObj.last ?? '');
+    setEmail(user.Email ?? user.email ?? '');
+  }, [user]);
+
+  const onSave = async () => {
+    setSaving(true);
+    try {
+      const payload = { FullName: { FirstName: firstName, LastName: lastName }, Email: email };
+      const res = await axios.put(`${import.meta.env.VITE_BASE_URL}/users/update`, payload, {
+        headers: { Authorization: `Bearer ${localStorage.getItem('token')}` }
+      });
+      const updated = res.data?.user;
+      if (updated) {
+        setUser(updated);
+        localStorage.setItem('user', JSON.stringify(updated));
+        setEditing(false);
+      } else {
+        alert('Failed to update profile');
+      }
+    } catch (err) {
+      alert(err.response?.data?.message || 'Update failed');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <div>
+      <h4 className="font-semibold mb-2">Account details</h4>
+      <div className="grid grid-cols-2 gap-3 text-sm text-gray-700">
+        <div>
+          <div className="text-xs text-gray-400">First name</div>
+          {editing ? (
+            <input className="border rounded px-2 py-1 w-full" value={firstName} onChange={(e) => setFirstName(e.target.value)} />
+          ) : (
+            <div>{firstName || '-'}</div>
+          )}
+        </div>
+        <div>
+          <div className="text-xs text-gray-400">Last name</div>
+          {editing ? (
+            <input className="border rounded px-2 py-1 w-full" value={lastName} onChange={(e) => setLastName(e.target.value)} />
+          ) : (
+            <div>{lastName || '-'}</div>
+          )}
+        </div>
+        <div className="col-span-2">
+          <div className="text-xs text-gray-400">Email</div>
+          {editing ? (
+            <input className="border rounded px-2 py-1 w-full" value={email} onChange={(e) => setEmail(e.target.value)} />
+          ) : (
+            <div>{email || '-'}</div>
+          )}
+        </div>
+      </div>
+
+      <div className="mt-4 flex gap-2">
+        {editing ? (
+          <>
+            <button disabled={saving} className="flex-1 bg-green-600 text-white py-2 rounded-lg" onClick={onSave}>{saving ? 'Saving...' : 'Save'}</button>
+            <button disabled={saving} className="flex-1 bg-gray-300 text-black py-2 rounded-lg" onClick={() => setEditing(false)}>Cancel</button>
+          </>
+        ) : (
+          <>
+            <button className="flex-1 bg-green-600 text-white py-2 rounded-lg" onClick={() => setEditing(true)}>Edit Profile</button>
+            <button className="flex-1 bg-red-500 text-white py-2 rounded-lg" onClick={() => { navigate('/user/logout'); }}>Logout</button>
+          </>
+        )}
+      </div>
+    </div>
+  );
 }
