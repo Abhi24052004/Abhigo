@@ -38,7 +38,7 @@ const CaptainRiding = () => {
                 </Link>
             </div>
 
-            <div className='h-1/5 p-6 flex items-center justify-between relative bg-yellow-400 pt-10'
+            <div className='h-1/6 p-6 flex items-center justify-between relative bg-yellow-400 pt-10'
                 onClick={() => {
                     setFinishRidePanel(true)
                 }}
@@ -46,8 +46,8 @@ const CaptainRiding = () => {
                 <h5 className='p-1 text-center w-[90%] absolute top-0' onClick={() => {
 
                 }}><i className="text-3xl text-gray-800 ri-arrow-up-wide-line"></i></h5>
-                <h4 className='text-xl font-semibold'>{'4 KM away'}</h4>
-                <button className=' bg-green-600 text-white font-semibold p-3 px-10 rounded-lg'>Complete Ride</button>
+                {/* <h4 className='text-xl font-semibold'>{'4 KM away'}</h4> */}
+                <button className=' bg-green-600 text-white font-semibold p-3 px-10 rounded-lg mx-auto w-90 text-xl'>Complete Ride</button>
             </div>
             <div ref={finishRidePanelRef} className='fixed w-full z-[500] bottom-0 translate-y-full bg-white px-3 py-10 pt-12'>
                 <FinishRide
