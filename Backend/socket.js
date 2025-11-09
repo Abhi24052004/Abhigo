@@ -57,6 +57,81 @@ function initializeSocket(server) {
             }
         });
 
+        // Normal (non-event) ride room join
+        socket.on('join-ride', async (data) => {
+            try {
+                const { rideId, userId, userType } = data || {};
+                if (!rideId || !userId || !userType) return socket.emit('error', { message: 'Missing join-ride params' });
+                const ride = await rideModel.findById(rideId).populate('user').populate('captain');
+                if (!ride) return socket.emit('error', { message: 'Ride not found' });
+                if (ride.eventDateTime) return socket.emit('error', { message: 'Use join-event for event ride' });
+
+                // membership checks
+                if (userType === 'captain') {
+                    if (!ride.captain || String(ride.captain._id) !== String(userId)) {
+                        return socket.emit('error', { message: 'Captain mismatch for ride' });
+                    }
+                } else if (userType === 'user') {
+                    if (!ride.user || String(ride.user._id) !== String(userId)) {
+                        return socket.emit('error', { message: 'User mismatch for ride' });
+                    }
+                } else {
+                    return socket.emit('error', { message: 'Invalid userType' });
+                }
+
+                const room = `ride:${ride._id}`;
+                socket.join(room);
+                socket.emit('joined-ride', { rideId: ride._id, role: userType });
+            } catch (err) {
+                console.error('join-ride error:', err);
+                socket.emit('error', { message: 'Failed to join ride' });
+            }
+        });
+
+        // Chat messaging inside ride room (event or normal)
+        socket.on('ride-message', async (data) => {
+            try {
+                const { rideId, userId, userType, text } = data || {};
+                if (!rideId || !userId || !userType || !text) return socket.emit('error', { message: 'Missing ride-message params' });
+                const ride = await rideModel.findById(rideId).populate('user').populate('captain');
+                if (!ride) return socket.emit('error', { message: 'Ride not found' });
+
+                // membership validation
+                const isCaptain = userType === 'captain' && ride.captain && String(ride.captain._id) === String(userId);
+                const isUser = userType === 'user' && ride.user && String(ride.user._id) === String(userId);
+                if (!isCaptain && !isUser) return socket.emit('error', { message: 'Not authorized for this ride' });
+
+                const room = `ride:${ride._id}`;
+                const payload = {
+                    rideId: ride._id,
+                    from: userType,
+                    userId,
+                    text: String(text).slice(0, 2000),
+                    ts: Date.now()
+                };
+                io.to(room).emit('ride-message', payload);
+
+                // Fallback: if counterpart not currently in the room, emit directly to their socket
+                try {
+                    const roomSet = io.sockets.adapter.rooms.get(room) || new Set();
+                    const senderSocketId = socket.id;
+                    const targetSockets = [];
+                    if (ride.user && ride.user.socketId && userType !== 'user') targetSockets.push(ride.user.socketId);
+                    if (ride.captain && ride.captain.socketId && userType !== 'captain') targetSockets.push(ride.captain.socketId);
+                    targetSockets.forEach((sid) => {
+                        if (sid && !roomSet.has(sid) && sid !== senderSocketId) {
+                            io.to(sid).emit('ride-message', payload);
+                        }
+                    });
+                } catch (e) {
+                    console.error('ride-message fallback emit error:', e);
+                }
+            } catch (err) {
+                console.error('ride-message error:', err);
+                socket.emit('error', { message: 'Failed to send message' });
+            }
+        });
+
         socket.on('update-location-captain', async (data) => {
             const { userId, location } = data || {};
             if (!userId || !location || typeof location.ltd !== 'number' || typeof location.lng !== 'number') {
