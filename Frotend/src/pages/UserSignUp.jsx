@@ -5,6 +5,7 @@ import axios from 'axios'
 import {UserDataContext} from '../context/UserContext'
 import { useContext } from 'react'
 import { useNavigate } from 'react-router-dom'
+import abhi from "../img/abhi.png";
 
 function UserSignUp() {
   let [email, setEmail] = useState("");
@@ -46,7 +47,7 @@ function UserSignUp() {
       <div className="p-7 flex flex-col justify-between h-screen">
 
         <div>
-          <img src="../src/img/abhi.png" alt="abhi" className=" h-25 w-60 mb-2" />
+          <img src={abhi} alt="abhi" className=" h-25 w-60 mb-2" />
           <form onSubmit={(e) => { handleSubmit(e) }}>
             <h3 className="text-lg font-semibold mb-5">What's your Name </h3>
             <div className="flex gap-4">
