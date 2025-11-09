@@ -37,14 +37,14 @@ function ConfirmRidePopUp(props) {
                     <h4 className="text-base font-bold">{props.ride?.user?.FullName?.FirstName + " " + props.ride?.user?.FullName?.LastName}</h4>
                 </div>
                 <div className="">
-                    <p className="font-bold">2.2KM </p>
+                    <p className="font-bold"></p>
                 </div>
             </div>
             <div>
                 <div className="flex flex-col  gap-3 mt-3 ">
 
-                    <h2 className="flex  gap-3  border-b-2 border-gray-200"><i className="ri-map-pin-line  flex items-center"></i> <div className="flex flex-col mb-2"> <p className="font-semibold text-xl">562/42B</p> <span className="text-sm font-light">{props.ride?.pickup}</span> </div></h2>
-                    <h2 className="flex  gap-3 border-b-2 border-gray-200"><i className="ri-map-pin-2-fill flex items-center"></i> <div className="flex flex-col mb-2"> <p className="font-semibold text-xl">562/42B</p> <span className="text-sm font-light">{props.ride?.destination}</span></div> </h2>
+                    <h2 className="flex  gap-3  border-b-2 border-gray-200"><i className="ri-map-pin-line  flex items-center"></i> <div className="flex flex-col mb-2"> <p className="font-semibold text-xl"></p> <span className="text-sm font-light">{props.ride?.pickup}</span> </div></h2>
+                    <h2 className="flex  gap-3 border-b-2 border-gray-200"><i className="ri-map-pin-2-fill flex items-center"></i> <div className="flex flex-col mb-2"> <p className="font-semibold text-xl"></p> <span className="text-sm font-light">{props.ride?.destination}</span></div> </h2>
                     <h2 className="flex gap-3 "><i className="ri-money-rupee-circle-fill flex items-center "></i> <div className="flex flex-col"> <p className="font-semibold text-xl">{"  " + props.ride?.fare}</p> <span className="text-sm font-light">Cash</span> </div></h2>
                 </div>
             </div>
