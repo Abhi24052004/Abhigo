@@ -19,5 +19,12 @@ router.post("/login",[
 
 router.get("/getprofile",authMiddleware.authUser,userController.getProfile);
 router.get("/logout",authMiddleware.authUser,userController.logoutUser);
+router.get('/findByEmail', userController.findByEmail);
+router.post('/updatePassword', userController.updatePassword);
+
+router.put('/update',
+    authMiddleware.authUser,
+    userController.updateUser
+);
 
 module.exports= router;
