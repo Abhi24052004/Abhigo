@@ -56,3 +56,44 @@ module.exports.logoutUser=async (req,res,next)=>{
     res.clearCookie('token');
     res.status(200).json({message:"Logout successfully"});
 }
+
+module.exports.updateUser = async (req, res, next) => {
+    try {
+        const userId = req.user?._id;
+        if (!userId) return res.status(401).json({ message: 'Unauthorized' });
+        const { FullName, Email } = req.body;
+        const FirstName = FullName?.FirstName;
+        const LastName = FullName?.LastName;
+        const updated = await userService.updateUser({ userId, FirstName, LastName, Email });
+        return res.status(200).json({ user: updated });
+    } catch (err) {
+        return res.status(400).json({ message: err.message });
+    }
+}
+
+module.exports.findByEmail = async (req, res, next) => {
+    try {
+        const email = req.query.email || req.query.Email;
+        if (!email) return res.status(400).json({ message: 'email query required' });
+        const user = await userService.getUserByEmail(email);
+        if (!user) return res.status(404).json({ message: 'No user exists with this email' });
+        // Return minimal public profile
+        const payload = { _id: user._id, Email: user.Email, FullName: user.FullName };
+        return res.status(200).json(payload);
+    } catch (err) {
+        return res.status(400).json({ message: err.message });
+    }
+}
+
+module.exports.updatePassword = async (req, res, next) => {
+    try {
+        const { userId, pasword } = req.body || {};
+        if (!userId || !pasword) return res.status(400).json({ message: 'userId and pasword required' });
+        const hashed = await userModel.hashPassword(pasword);
+        const user = await userService.updateUserPassword({ userId, hashedPassword: hashed });
+        if (!user) return res.status(404).json({ message: 'User not found' });
+        return res.status(200).json({ message: 'Password updated' });
+    } catch (err) {
+        return res.status(400).json({ message: err.message });
+    }
+}
