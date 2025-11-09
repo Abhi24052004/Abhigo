@@ -27,3 +27,21 @@ module.exports.createCaptain=async({fullname,email,password,status,vehicle,locat
     })
     return captain;
 }
+
+module.exports.getCaptainByEmail = async (email) => {
+    if (!email) throw new Error('Email required');
+    const captain = await captainModel.findOne({ email });
+    return captain;
+}
+
+module.exports.updateCaptainPassword = async ({ captainId, hashedPassword }) => {
+    if (!captainId || !hashedPassword) throw new Error('captainId and hashedPassword required');
+    const captain = await captainModel.findByIdAndUpdate(
+        captainId,
+        { password: hashedPassword },
+        { new: true }
+    );
+    return captain;
+}
+
+
