@@ -58,7 +58,7 @@ function UserSignUp() {
             <input required type="email" value={email} onChange={(e) => { setEmail(e.target.value) }} placeholder="example@gmail.com" className="text-lg mb-5 bg-[#eeeeee] placeholder:base border w-full px-4 py-2 " />
             <h3 className="text-lg font-semibold mb-3 ">Enter Your Password : </h3>
             <input required type="password" value={password} onChange={(e) => { setPassword(e.target.value) }} className="text-lg mb-5 bg-[#eeeeee] placeholder:text-base border w-full px-4 py-2" placeholder="password" />
-            <button className=" flex justify-center items-center w-full text-lg mb-3 font-semibold bg-black text-white py-2 px-3 cursor-pointer">Create Account</button>
+            <button className="bg-[#111] text-white font-semibold mb-3 rounded-lg px-4 py-2 w-full text-lg placeholder:text-base  cursor-pointer">Create Account</button>
           </form>
           <p className="text-center"> Already have a Account ? <Link to="/user/Login" className="text-blue-600">Login here</Link></p>
 
