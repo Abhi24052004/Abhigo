@@ -25,8 +25,6 @@ const LiveTracking = ({ ride, User }) => {
 
   // to get current position 
   useEffect(() => {
-    console.log("info",ride," ",User);
-    
     if (!('geolocation' in navigator)) return;
     const onSuccess = (position) => {
       const newPos = { lat: position.coords.latitude, lng: position.coords.longitude };
@@ -268,4 +266,3 @@ const LiveTracking = ({ ride, User }) => {
 }
 
 export default LiveTracking
-
