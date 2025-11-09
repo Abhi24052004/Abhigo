@@ -5,6 +5,7 @@ import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import axios from 'axios'
 import { CaptainDataContext } from '../context/CapatainContext'
+import abhi from "../img/abhi.png";
 
 const Captainlogin = () => {
 
@@ -42,7 +43,7 @@ const Captainlogin = () => {
   return (
     <div className='p-7 h-screen flex flex-col justify-between'>
       <div>
-        <img src="../src/img/abhi.png" alt="abhi" className=" h-25 w-60 mb-2" />
+        <img src={abhi} alt="abhi" className=" h-25 w-60 mb-2" />
         <form onSubmit={(e) => {
           submitHandler(e)
         }}>
