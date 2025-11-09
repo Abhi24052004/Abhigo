@@ -1,6 +1,7 @@
 import React, { useMemo } from 'react'
 
 function RidePopUp(props) {
+      console.log(props?.ride);
     const passengerName = useMemo(() => {
         const user = props.ride?.user;
         if (!user) return 'Passenger';
@@ -25,7 +26,7 @@ function RidePopUp(props) {
                     <p className="font-bold">
                         <i className="ri-money-rupee-circle-line"></i>{'  '}{props.ride?.fare}
                     </p>
-                    <p className="text-sm text-gray-500 font-light text-right">2.2KM</p>
+                    <p className="text-sm text-gray-500 font-light text-right"></p>
                 </div>
             </div>
             <div>
