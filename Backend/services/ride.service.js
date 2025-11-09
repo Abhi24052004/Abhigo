@@ -85,6 +85,22 @@ module.exports.getAllCaptainEvent=async(captainId)=>{
     }
 }
 
+module.exports.getAllCaptainRides = async (captainId) => {
+    if (!captainId) {
+        throw new Error('Captain id is required');
+    }
+    try {
+        // Fetch both normal and event rides where this captain is assigned.
+        const rides = await rideModel.find({
+            captain: captainId
+        }).sort({ createdAt: -1 }).populate('user').populate('captain').select('+otp');
+        return rides;
+    } catch (err) {
+        console.error('Error fetching captain rides:', err);
+        throw err;
+    }
+}
+
 
 module.exports.createRide = async ({
     user, pickup, destination, vehicleType
