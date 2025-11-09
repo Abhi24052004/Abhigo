@@ -2,8 +2,19 @@ import React, { useContext, useEffect, useMemo, useRef, useState } from 'react'
 import LiveTracking from '../components/updatedLiveTracking'
 import { SocketContext } from '../context/SocketContext'
 
+
+const VEHICLE_IMAGES = {
+  car: 'https://swyft.pl/wp-content/uploads/2023/05/how-many-people-can-a-uberx-take.jpg',
+  moto: 'https://shorturl.at/5zCIa',
+  auto: 'https://shorturl.at/B2YCj',
+};
+
 const Driver = (props) => {
-  const [isUser,setIsUser]=useState(true);
+
+  const vehicle = props?.ride?.captain?.vehicle?.vehicleType || 'car';
+  const link = VEHICLE_IMAGES[vehicle] || VEHICLE_IMAGES.car;
+
+  const [isUser, setIsUser] = useState(true);
   const { socket } = useContext(SocketContext)
 
   const rideId = props?.ride?._id
@@ -88,11 +99,11 @@ const Driver = (props) => {
       {/* Bottom half: driver/details (keep original styling but ensure scroll on small screens) */}
       <div className='h-[47%] p-4 overflow-auto'>
         <div className='flex items-center justify-between'>
-          <img className='h-12' src="https://swyft.pl/wp-content/uploads/2023/05/how-many-people-can-a-uberx-take.jpg" alt="" />
+          <img className='h-12' src={link} alt="" />
           <div className='text-right'>
             <h2 className='text-lg font-medium capitalize break-words'>{props.ride?.captain.fullname.firstname}</h2>
             <h4 className='text-xl font-semibold -mt-1 -mb-1 break-words'>{props.ride?.captain.vehicle.plate}</h4>
-            <p className='text-sm text-gray-600'>Maruti Suzuki Alto</p>
+            {/* <p className='text-sm text-gray-600'>Maruti Suzuki Alto</p> */}
             <h1 className='text-lg font-semibold'>  {props.ride?.otp} </h1>
           </div>
         </div>
@@ -167,7 +178,7 @@ const Driver = (props) => {
               placeholder='Type a message'
               className='flex-1 px-3 py-2 text-sm border rounded-lg outline-none focus:ring-2 focus:ring-amber-400'
             />
-            <button onClick={sendMessage} disabled={!joined || text.trim()===''} className={`px-3 py-2 rounded-lg text-sm ${(!joined || text.trim()==='') ? 'bg-gray-300 text-gray-600 cursor-not-allowed' : 'bg-amber-500 text-white'}`}>Send</button>
+            <button onClick={sendMessage} disabled={!joined || text.trim() === ''} className={`px-3 py-2 rounded-lg text-sm ${(!joined || text.trim() === '') ? 'bg-gray-300 text-gray-600 cursor-not-allowed' : 'bg-amber-500 text-white'}`}>Send</button>
           </div>
         </div>
       )}
