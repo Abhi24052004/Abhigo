@@ -1,24 +1,5 @@
 import React from "react";
 
-/**
- * UserRideDetails
- * Props:
- * - ride: the ride object to display
- * - allRides: (optional) full array of rides (provided by Home)
- * - onClose: function to call when closing the details panel
- *
- * This component shows a modal / bottom-sheet style card with:
- * - Title: "Ride Details" or "Event Details" depending on ride.isEvent
- * - Subtitle: "Ride" or "Event"
- * - Captain name in place of user_name
- * - Price
- * - Date & Time (date shown as dd/mm/yyyy)
- * - Pickup
- * - Destination
- * - Special Requirements (only for events)
- *
- * Styling uses the same utility classes / look-and-feel as the screenshots the user provided.
- */
 export default function UserRideDetails({ ride, allRides = [], onClose }) {
   if (!ride) return null;
 
