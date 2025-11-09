@@ -38,6 +38,11 @@ router.get('/captainEvent',
     rideController.getAllCaptainEvents
 )
 
+router.get('/captainRides',
+    authMiddleware.authCaptain,
+    rideController.getAllCaptainRides
+)
+
 router.get('/userRides',
     authMiddleware.authUser,
     rideController.getAllUserRides
