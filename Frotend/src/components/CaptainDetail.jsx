@@ -1,4 +1,4 @@
-import React, { useContext, useEffect, useState, useMemo, useRef, useCallback } from 'react'
+import React, { useContext, useEffect, useState, useMemo } from 'react'
 import { CaptainDataContext } from '../context/CapatainContext'
 import { SocketContext } from '../context/SocketContext'
 import axios from 'axios'
@@ -23,10 +23,15 @@ const BottomSheet = ({ open, onClose, title, children }) => {
   )
 }
 
-/* Modal for viewing single event details */
+/* Modal for viewing single event details (updated layout per request)
+   - User + Price box at top
+   - Other info below (Date & Time, Pickup, Destination, Special Requirements)
+   - Removed top-right Close button (bottom Close remains)
+*/
 const DetailModal = ({ open, onClose, event, startEvent, formatDateDMY }) => {
   if (!open || !event) return null
 
+  // Safe field extraction with fallbacks (no objects rendered directly)
   const pickup = event?.pickup ?? event?.pickupAddress ?? event?.pickup_location ?? event?.startAddress ?? 'Not provided'
   const destination = event?.destination ?? event?.dropoff ?? event?.to ?? event?.endAddress ?? 'Not provided'
 
@@ -38,12 +43,15 @@ const DetailModal = ({ open, onClose, event, startEvent, formatDateDMY }) => {
   const price = event?.fare ?? event?.price ?? event?.amount ?? event?.estimatedFare ?? null
   const specialReq = event?.specialRequest ?? event?.specialReq ?? event?.notes ?? event?.instructions ?? ''
 
-  const dateRaw = event?.eventDateTime ?? event?.date ?? event?.scheduledAt ?? event?.datetime ?? null
+  // Use eventDateTime for events, createdAt for normal rides
+  const isEvent = !!event?.eventDateTime
+  const dateRaw = isEvent ? event.eventDateTime : (event?.createdAt ?? event?.date ?? event?.scheduledAt ?? event?.datetime ?? null)
   const dt = dateRaw ? new Date(dateRaw) : null
   const dateStr = dt ? formatDateDMY(dt) : 'Date TBD'
   const timeStr = dt ? dt.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : 'Time TBD'
 
-  const isEventToday = dt ? (() => {
+  // Check if event is today (only relevant for events, not normal rides)
+  const isEventToday = isEvent && dt ? (() => {
     const now = new Date()
     return dt.getFullYear() === now.getFullYear() && dt.getMonth() === now.getMonth() && dt.getDate() === now.getDate()
   })() : false
@@ -52,11 +60,13 @@ const DetailModal = ({ open, onClose, event, startEvent, formatDateDMY }) => {
     <div className="fixed inset-0 z-60 flex items-center justify-center" aria-modal="true" role="dialog">
       <div className="absolute inset-0 bg-black/50" onClick={onClose} />
       <div className="relative w-full max-w-md bg-white rounded-xl shadow-xl p-5 mx-4">
+        {/* Top: Title */}
         <div className="mb-3">
           <h2 className="text-xl font-bold">Event Details</h2>
           <p className="text-sm text-gray-500 mt-1">{event?.title ?? event?.name ?? 'Event'}</p>
         </div>
 
+        {/* User + Price box at top (side-by-side) */}
         <div className="grid grid-cols-2 gap-3 items-center">
           <div className="p-3 bg-white rounded-lg shadow-sm">
             <div className="text-xs text-gray-500">User</div>
@@ -69,6 +79,7 @@ const DetailModal = ({ open, onClose, event, startEvent, formatDateDMY }) => {
           </div>
         </div>
 
+        {/* Other details below */}
         <div className="mt-4 space-y-3">
           <div className="bg-gray-50 p-3 rounded-lg">
             <div className="text-xs text-gray-500">Date & Time</div>
@@ -91,6 +102,7 @@ const DetailModal = ({ open, onClose, event, startEvent, formatDateDMY }) => {
           </div>
         </div>
 
+        {/* Bottom buttons */}
         <div className="mt-5 flex justify-end gap-3">
           {isEventToday ? (
             <>
@@ -115,78 +127,67 @@ const CaptainDetails = (props) => {
   const [sheetOpen, setSheetOpen] = useState(false)
   const [detailOpen, setDetailOpen] = useState(false)
   const [selectedEvent, setSelectedEvent] = useState({})
-  const controllerRef = useRef(null)
+  const [profileOpen, setProfileOpen] = useState(false)
+  const [captainTab, setCaptainTab] = useState('profile')
+  const [rideHistory, setRideHistory] = useState([])
+  const [totalRides, setTotalRides] = useState(0)
+  const [totalEarnings, setTotalEarnings] = useState(0)
 
-  // fetch function (callable for retry and on-demand)
-  const fetchCaptainEvents = useCallback(async () => {
+  // Fetch ride history on component mount to calculate stats
+  useEffect(() => {
     if (!captain?._id) return
-    // abort any previous request
-    try {
-      controllerRef.current?.abort()
-    } catch (e) {
-      // ignore
-    }
-    const controller = new AbortController()
-    controllerRef.current = controller
-
-    setLoadingEvents(true)
-    setEventsError(null)
-
-    const url = `${import.meta.env.VITE_BASE_URL}/rides/captainEvent`
-    try {
-      const res = await axios.get(url, {
-        params: { captainId: captain._id },
-        headers: { Authorization: `Bearer ${localStorage.getItem('token')}` },
-        signal: controller.signal
-      })
-
-      const payload = Array.isArray(res.data) ? res.data : (res.data ? [res.data] : [])
-      setAllEvent(payload)
-    } catch (err) {
-      // axios in modern versions throws a CanceledError when aborted (code: 'ERR_CANCELED')
-      const isCanceled = err?.code === 'ERR_CANCELED' || err?.name === 'CanceledError'
-      if (isCanceled) {
-        // request was cancelled: ignore
-        return
+    (async () => {
+      try {
+        const res = await axios.get(`${import.meta.env.VITE_BASE_URL}/rides/captainRides`, {
+          params: { captainId: captain._id },
+          headers: { Authorization: `Bearer ${localStorage.getItem('token')}` }
+        })
+        const rides = Array.isArray(res.data) ? res.data : []
+        setRideHistory(rides)
+        setTotalRides(rides.length)
+        const earnings = rides.reduce((sum, ride) => sum + (ride?.fare ?? 0), 0)
+        setTotalEarnings(earnings)
+      } catch (_) {
+        setRideHistory([])
+        setTotalRides(0)
+        setTotalEarnings(0)
       }
-      console.error('Failed fetching captain events', {
-        error: err,
-        url,
-        captainId: captain._id,
-      })
-      // Prefer backend message if present
-      const message = err?.response?.data?.message || err?.response?.data || err?.message || 'Unknown error'
-      setEventsError(`${message}`)
-      setAllEvent([])
-    } finally {
-      setLoadingEvents(false)
-    }
+    })()
   }, [captain?._id])
 
-  // initial load when captain id becomes available
   useEffect(() => {
     if (!captain?._id) return
-    fetchCaptainEvents()
-    return () => {
+
+    const source = axios.CancelToken.source()
+    const fetchCaptainEvents = async () => {
       try {
-        controllerRef.current?.abort()
-      } catch (e) {
-        //
+        setLoadingEvents(true)
+        setEventsError(null)
+        const res = await axios.get(`${import.meta.env.VITE_BASE_URL}/rides/captainEvent`, {
+          params: { captainId: captain._id },
+          headers: { Authorization: `Bearer ${localStorage.getItem('token')}` }
+        })
+        const payload = Array.isArray(res.data) ? res.data : (res.data ? [res.data] : [])
+        setAllEvent(payload)
+      } catch (err) {
+        if (!axios.isCancel(err)) {
+          setEventsError(err)
+          setAllEvent([])
+        }
+      } finally {
+        setLoadingEvents(false)
       }
     }
-  }, [captain?._id, fetchCaptainEvents])
 
-  // also fetch when sheet opens so user can retry and see fresh data
-  useEffect(() => {
-    if (sheetOpen) {
-      fetchCaptainEvents()
-    }
-  }, [sheetOpen, fetchCaptainEvents])
+    fetchCaptainEvents()
+    return () => source.cancel()
+  }, [captain?._id])
 
   // Safe name getters (captain)
   const firstName = captain?.fullname?.firstname || captain?.FullName?.FirstName || ''
   const lastName = captain?.fullname?.lastname || captain?.FullName?.LastName || ''
 
+  // helper: format date as dd/mm/yyyy with zero padding
   const formatDateDMY = (dateObj) => {
     if (!dateObj) return 'Date TBD'
     const d = dateObj.getDate().toString().padStart(2, '0')
@@ -195,6 +196,7 @@ const CaptainDetails = (props) => {
     return `${d}/${m}/${y}`
   }
 
+  // normalize & sort upcoming events ascending by date
   const upcomingEvents = useMemo(() => {
     const source = Array.isArray(allEvent) && allEvent.length > 0 ? allEvent : (captain?.events ? captain.events : (captain?.event ? [captain.event] : []))
     const normalized = source
@@ -213,8 +215,10 @@ const CaptainDetails = (props) => {
     return normalized
   }, [allEvent, captain])
 
+  // primary event = earliest (first) event if any
   const primaryEvent = useMemo(() => (upcomingEvents && upcomingEvents.length ? upcomingEvents[0] : null), [upcomingEvents])
 
+  // check whether primary event is today
   const isPrimaryEventToday = useMemo(() => {
     if (!primaryEvent) return false
     const d = primaryEvent?.eventDateTime ?? primaryEvent?.date ?? primaryEvent?.scheduledAt ?? primaryEvent?.datetime
@@ -231,7 +235,7 @@ const CaptainDetails = (props) => {
     const now = new Date()
     return upcomingEvents.some((ev) => {
       const d = ev?.eventDateTime ?? ev?.date ?? ev?.scheduledAt ?? ev?.datetime ?? null
-      if (!d) return true
+      if (!d) return true // unknown date -> treat as not today (showable)
       const evDate = new Date(d)
       return !(evDate.getFullYear() === now.getFullYear() && evDate.getMonth() === now.getMonth() && evDate.getDate() === now.getDate())
     })
@@ -245,6 +249,7 @@ const CaptainDetails = (props) => {
 
   const closeDetail = () => {
     setDetailOpen(false)
+    console.log(selectedEvent)
     setSelectedEvent(null)
   }
 
@@ -257,6 +262,7 @@ const CaptainDetails = (props) => {
         console.warn('Missing ids for startEvent', { eventId, captainId, userId })
       }
 
+      // Call backend to start event ride
       await axios.post(`${import.meta.env.VITE_BASE_URL}/rides/startEventRide`, {
         eventId,
         captainId,
@@ -265,11 +271,13 @@ const CaptainDetails = (props) => {
         headers: { Authorization: `Bearer ${localStorage.getItem('token')}` },
       })
 
+      // Update local UI state
       setDetailOpen(false)
       props.setRide(selectedEvent)
       props.setArrivedPopUpPanel(true)
       setSelectedEvent(null)
 
+      // Explicitly join event room via socket (even though auto join may also occur)
       if (socket && eventId && captainId) {
         socket.emit('join-event', { rideId: eventId, userId: captainId, userType: 'captain' })
       }
@@ -278,22 +286,44 @@ const CaptainDetails = (props) => {
     }
   }
 
+  // const startRide= async() => {
+  //   setDetailOpen(false)
+  //   setSelectedEvent(null)
+  //   await axios.post(
+  //     `${import.meta.env.VITE_BASE_URL}/rides/startEventRide`,
+  //     { eventId: selectedEvent._id ,
+  //       captainId: selectedEvent.captain._id,
+  //       userId: selectedEvent.user._id
+  //     },
+  //     {
+  //       headers: { Authorization: `Bearer ${localStorage.getItem('token')}` },
+  //     }
+  //   ) 
+  // }
+
+  // small utility to display short date (e.g., "1 Nov") -- used in lists
   const dateDisplay = (raw) => {
     if (!raw) return 'Date TBD'
     const d = new Date(raw)
     return d.toLocaleDateString(undefined, { day: 'numeric', month: 'short' })
   }
 
+  // Ride history is now loaded on mount (see useEffect above with captain._id dependency)
+  // This ensures stats are calculated immediately when component renders
+
   return (
     <div className="p-4 w-full max-w-full overflow-x-hidden">
+      {/* Top row: avatar + name and earned */}
       <div className="flex items-center justify-between mb-4">
         <div className="flex items-center gap-3 min-w-0">
           <div className="relative flex-shrink-0">
             <div className="w-10 h-10 rounded-full overflow-hidden ring-2 ring-amber-200 shadow-sm">
               <img
-                className="w-10 h-10object-cover"
+                className="w-10 h-10object-cover cursor-pointer"
                 src={captain?.avatar || 'https://shorturl.at/srJPR'}
                 alt={firstName || 'Captain'}
+                onClick={() => setProfileOpen(true)}
+                title="Open captain profile"
               />
             </div>
             <span className="absolute bottom-0 right-0 h-3 w-3 bg-green-400 rounded-full ring-2 ring-white animate-pulse" />
@@ -304,34 +334,37 @@ const CaptainDetails = (props) => {
           </div>
         </div>
 
-        <div className="text-right flex-shrink-0">
-          <h4 className="text-xl font-semibold">₹{(captain?.balance || 0).toFixed(2)}</h4>
+        {/* <div className="text-right flex-shrink-0">
+          <h4 className="text-xl font-semibold">₹{totalEarnings.toFixed(2)}</h4>
           <p className="text-sm text-gray-500">Earned</p>
-        </div>
+        </div> */}
       </div>
 
+      {/* Stats card */}
       <div className="flex gap-4 p-3 bg-gradient-to-r from-white to-gray-50 rounded-xl shadow-inner items-start overflow-hidden">
-        <div className="flex-1 grid grid-cols-3 gap-2 text-center min-w-0">
+        <div className="flex-1 grid grid-cols-2 gap-2 text-center min-w-0">
           <div className="bg-white/60 p-3 rounded-lg shadow-sm">
             <i className="ri-timer-2-line text-2xl text-amber-500 block mb-1"></i>
-            <h5 className="text-lg font-medium">{captain?.hoursOnline ?? '—'}</h5>
-            <p className="text-xs text-gray-500">Hours Online</p>
+            <h5 className="text-lg font-medium">{totalEarnings.toFixed(2) ?? '—'}</h5>
+            <p className="text-xs text-gray-500">Earning</p>
           </div>
           <div className="bg-white/60 p-3 rounded-lg shadow-sm">
             <i className="ri-speed-up-line text-2xl text-amber-500 block mb-1"></i>
-            <h5 className="text-lg font-medium">{captain?.ridesCompleted ?? '—'}</h5>
+            <h5 className="text-lg font-medium">{totalRides}</h5>
             <p className="text-xs text-gray-500">Rides</p>
           </div>
-          <div className="bg-white/60 p-3 rounded-lg shadow-sm">
+          {/* <div className="bg-white/60 p-3 rounded-lg shadow-sm">
             <i className="ri-star-line text-2xl text-amber-500 block mb-1"></i>
             <h5 className="text-lg font-medium">{captain?.rating ?? '—'}</h5>
             <p className="text-xs text-gray-500">Rating</p>
-          </div>
+          </div> */}
         </div>
       </div>
 
+      {/* Primary banner (only if today's event exists) */}
       {bannerEvent ? (
         <div className="mt-4">
+          {/* Attention badge at top */}
           <div className="flex items-center gap-2 mb-2 animate-bounce">
             <div className="w-2 h-2 bg-red-500 rounded-full animate-pulse"></div>
             <span className="text-sm font-semibold text-red-600">⚠️ You have an event TODAY!</span>
@@ -384,20 +417,12 @@ const CaptainDetails = (props) => {
         </div>
       )}
 
+      {/* Bottom sheet (mobile) */}
       <BottomSheet open={sheetOpen} onClose={() => setSheetOpen(false)} title="Upcoming Events">
         {loadingEvents ? (
           <div className="p-3 rounded-lg bg-white/60 text-sm text-gray-600">Loading events...</div>
         ) : eventsError ? (
-          <div className="p-3 space-y-3">
-            <div className="rounded-lg bg-rose-50 p-3 text-sm text-rose-700">
-              Error loading events: {eventsError}
-            </div>
-            <div className="flex gap-2">
-              <button onClick={() => fetchCaptainEvents()} className="px-3 py-2 bg-amber-300 rounded-md font-semibold">Retry</button>
-              <button onClick={() => { setSheetOpen(false); }} className="px-3 py-2 bg-white border rounded-md">Close</button>
-            </div>
-            <div className="text-xs text-gray-500 mt-2">Open DevTools → Network to inspect the request URL and response.</div>
-          </div>
+          <div className="p-3 rounded-lg bg-rose-50 text-sm text-rose-700">Error loading events</div>
         ) : upcomingEvents.length === 0 ? (
           <div className="p-3 rounded-lg bg-white/60 text-sm text-gray-600">No upcoming events.</div>
         ) : (
@@ -417,6 +442,7 @@ const CaptainDetails = (props) => {
                     </div>
                     <div className="flex flex-col items-end gap-2 ml-4">
                       <button onClick={() => openDetail(ev)} className="px-3 py-1.5 bg-amber-50 text-amber-700 rounded-md text-sm font-medium shadow-sm hover:brightness-105">View</button>
+                      {/* <div className="text-xs text-gray-400 mt-1">{dateRaw ? formatDateDMY(new Date(dateRaw)) : 'Date TBD'}</div> */}
                     </div>
                   </div>
                 </div>
@@ -426,9 +452,141 @@ const CaptainDetails = (props) => {
         )}
       </BottomSheet>
 
+      {/* Captain profile bottom sheet */}
+      <BottomSheet open={profileOpen} onClose={() => { setProfileOpen(false); setCaptainTab('profile') }} title="Captain">
+        {/* Header */}
+        <div className="flex items-center gap-3 mb-3">
+          <img className="h-12 w-12 rounded-full object-cover ring-2 ring-amber-200" src={captain?.avatar || 'https://shorturl.at/srJPR'} alt={firstName || 'Captain'} />
+          <div>
+            <div className="font-semibold capitalize">{(firstName + ' ' + (lastName || '')).trim() || 'Captain'}</div>
+            <div className="text-sm text-gray-500">{captain?.email || ''}</div>
+          </div>
+        </div>
+
+        {/* Tabs */}
+        <div className="flex gap-2 mb-4">
+          <button onClick={() => setCaptainTab('profile')} className={`flex-1 py-2 rounded-lg ${captainTab === 'profile' ? 'bg-black text-white' : 'bg-gray-100'}`}>Profile</button>
+          <button onClick={() => setCaptainTab('history')} className={`flex-1 py-2 rounded-lg ${captainTab === 'history' ? 'bg-black text-white' : 'bg-gray-100'}`}>History</button>
+        </div>
+
+        {/* Tab content */}
+        {captainTab === 'profile' && <CaptainProfilePanel onClose={() => setProfileOpen(false)} />}
+
+        {captainTab === 'history' && (
+          <div>
+            <h4 className="font-semibold mb-2">Your ride history</h4>
+            {rideHistory.length === 0 ? (
+              <div className="text-sm text-gray-500">No history found.</div>
+            ) : (
+              <div className="space-y-2">
+                {rideHistory.slice(0, 10).map((item, idx) => {
+                  const isEvent = !!item?.eventDateTime
+                  const type = isEvent ? 'Event' : 'Ride'
+                  const when = isEvent ? item.eventDateTime : (item?.createdAt ?? null)
+                  const statusLabel = item?.status ? String(item.status).charAt(0).toUpperCase() + String(item.status).slice(1) : ''
+                  
+                  return (
+                    <div key={item?._id ?? idx} className="p-3 border rounded flex items-center justify-between">
+                      <div className="flex-1">
+                        <div className="flex items-center gap-2">
+                          <span className="font-medium">{type}</span>
+                          {statusLabel && <span className={`text-xs px-2 py-0.5 rounded ${item.status === 'completed' ? 'bg-green-100 text-green-700' : item.status === 'ongoing' ? 'bg-blue-100 text-blue-700' : 'bg-gray-100 text-gray-700'}`}>{statusLabel}</span>}
+                        </div>
+                        <div className="text-xs text-gray-500 mt-1">{when ? new Date(when).toLocaleString() : 'Date TBD'}</div>
+                      </div>
+                      <button onClick={() => { setSelectedEvent(item); setDetailOpen(true) }} className="px-3 py-1.5 bg-amber-50 text-amber-700 rounded text-sm flex-shrink-0">View</button>
+                    </div>
+                  )
+                })}
+              </div>
+            )}
+          </div>
+        )}
+      </BottomSheet>
+
+      {/* Detail modal */}
       <DetailModal open={detailOpen} onClose={closeDetail} event={selectedEvent} startEvent={startEvent} formatDateDMY={formatDateDMY} />
     </div>
   )
 }
 
 export default CaptainDetails
+
+// Inline profile panel for captain (edit basic fields locally)
+function CaptainProfilePanel({ onClose }) {
+  const { captain, setCaptain } = useContext(CaptainDataContext)
+  const [editing, setEditing] = useState(false)
+  const [firstName, setFirstName] = useState('')
+  const [lastName, setLastName] = useState('')
+  const [email, setEmail] = useState('')
+
+  useEffect(() => {
+    if (!captain) return
+    setFirstName(captain?.fullname?.firstname || '')
+    setLastName(captain?.fullname?.lastname || '')
+    setEmail(captain?.email || '')
+  }, [captain])
+
+  const onSave = async () => {
+    // For now, update locally. Backend update route can be added similarly to user update.
+    setCaptain(prev => {
+      if (!prev) return prev
+      return {
+        ...prev,
+        fullname: { ...(prev.fullname || {}), firstname: firstName, lastname: lastName },
+        email
+      }
+    })
+    setEditing(false)
+    if (typeof onClose === 'function') {
+      // keep panel open after save; comment next line to close automatically
+      // onClose()
+    }
+  }
+
+  return (
+    <div>
+      <h4 className="font-semibold mb-2">Account details</h4>
+      <div className="grid grid-cols-2 gap-3 text-sm text-gray-700">
+        <div>
+          <div className="text-xs text-gray-500">First name</div>
+          {editing ? (
+            <input className="border rounded px-2 py-1 w-full" value={firstName} onChange={(e) => setFirstName(e.target.value)} />
+          ) : (
+            <div>{firstName || '-'}</div>
+          )}
+        </div>
+        <div>
+          <div className="text-xs text-gray-500">Last name</div>
+          {editing ? (
+            <input className="border rounded px-2 py-1 w-full" value={lastName} onChange={(e) => setLastName(e.target.value)} />
+          ) : (
+            <div>{lastName || '-'}</div>
+          )}
+        </div>
+        <div className="col-span-2">
+          <div className="text-xs text-gray-500">Email</div>
+          {editing ? (
+            <input type="email" className="border rounded px-2 py-1 w-full" value={email} onChange={(e) => setEmail(e.target.value)} />
+          ) : (
+            <div>{email || '-'}</div>
+          )}
+        </div>
+      </div>
+
+      <div className="mt-4 flex gap-2">
+        {editing ? (
+          <>
+            <button className="flex-1 bg-green-600 text-white py-2 rounded-lg" onClick={onSave}>Save</button>
+            <button className="flex-1 bg-gray-200 py-2 rounded-lg" onClick={() => setEditing(false)}>Cancel</button>
+          </>
+        ) : (
+          <>
+            <button className="flex-1 bg-green-600 text-white py-2 rounded-lg" onClick={() => setEditing(true)}>Edit Profile</button>
+            <a href="/captain/logout" className="flex-1 bg-red-500 text-white py-2 rounded-lg text-center">Logout</a>
+          </>
+        )}
+      </div>
+    </div>
+  )
+}
