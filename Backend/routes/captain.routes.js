@@ -12,7 +12,7 @@ router.post("/register",[
     body('vehicle.color').isLength({ min: 3 }).withMessage('Color must be at least 3 characters long'),
     body('vehicle.plate').isLength({ min: 3 }).withMessage('Plate must be at least 3 characters long'),
     body('vehicle.capacity').isNumeric().withMessage('Capacity must be a number'),
-    body('vehicle.vehicleType').isIn(['car', 'moto', 'auto']).withMessage('Invalid vehicle type')
+    body('vehicle.vehicleType').isIn(['car','moto','auto']).withMessage('Invalid vehicle type')
 ],captainController.registerCaptain
 )
 
@@ -24,7 +24,11 @@ router.post("/login",[
 
 router.get("/getprofile",authMiddleware.authCaptain, captainController.getprofile);
 
+
 router.get("/logout",authMiddleware.authCaptain, captainController.logoutCaptain);
+
+router.get('/findByEmail', captainController.findByEmail);
+router.post('/updatePassword', captainController.updatePassword);
 
 
 module.exports = router;
