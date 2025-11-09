@@ -30,7 +30,7 @@ function RidePopUp(props) {
                     <p className="font-bold">
                         <i className="ri-money-rupee-circle-line"></i>{" " + props.ride?.fare}
                     </p>
-                    <p className="text-sm text-gray-500 font-light text-right">2.2KM</p>
+                    <p className="text-sm text-gray-500 font-light text-right"></p>
                 </div>
             </div>
 
