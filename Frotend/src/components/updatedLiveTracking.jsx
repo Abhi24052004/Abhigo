@@ -22,6 +22,36 @@ const LiveTracking = ({ ride, User }) => {
 
   const mapRef = useRef(null);
   const watchIdRef = useRef(null);
+  
+  // Stabilization refs to prevent jitter
+  const initialCenterRef = useRef(null);
+  const lastPanRef = useRef(null);
+  const followRef = useRef(true);
+  const userPausedRef = useRef(false);
+  const resumeTimerRef = useRef(null);
+
+  // Haversine distance in meters
+  const distanceMeters = (a, b) => {
+    if (!a || !b || a.lat == null || b.lat == null) return 0;
+    const R = 6371e3;
+    const φ1 = (a.lat * Math.PI) / 180;
+    const φ2 = (b.lat * Math.PI) / 180;
+    const Δφ = ((b.lat - a.lat) * Math.PI) / 180;
+    const Δλ = ((b.lng - a.lng) * Math.PI) / 180;
+    const x = Math.sin(Δφ / 2) * Math.sin(Δφ / 2) +
+              Math.cos(φ1) * Math.cos(φ2) * Math.sin(Δλ / 2) * Math.sin(Δλ / 2);
+    const c = 2 * Math.atan2(Math.sqrt(x), Math.sqrt(1 - x));
+    return R * c;
+  };
+
+  // Pan only if moved > 15m since last pan
+  const maybePan = (newPos) => {
+    if (!mapRef.current || !newPos || !followRef.current || userPausedRef.current) return;
+    if (!lastPanRef.current || distanceMeters(lastPanRef.current, newPos) > 15) {
+      mapRef.current.panTo(newPos);
+      lastPanRef.current = newPos;
+    }
+  };
 
   // to get current position 
   useEffect(() => {
@@ -31,7 +61,15 @@ const LiveTracking = ({ ride, User }) => {
     const onSuccess = (position) => {
       const newPos = { lat: position.coords.latitude, lng: position.coords.longitude };
       setCurrentPosition(newPos);
-      if (mapRef.current?.panTo) mapRef.current.panTo(newPos);
+      
+      // Set frozen initial center once
+      if (!initialCenterRef.current) {
+        initialCenterRef.current = newPos;
+        lastPanRef.current = newPos;
+      }
+      
+      // Only pan if moved significantly
+      maybePan(newPos);
     };
     const onError = (err) => console.error('geolocation error', err);
     navigator.geolocation.getCurrentPosition(onSuccess, onError, { enableHighAccuracy: true });
@@ -52,8 +90,18 @@ const LiveTracking = ({ ride, User }) => {
       const parsedLat = Number(lat);
       const parsedLng = Number(lng);
       if (!Number.isNaN(parsedLat) && !Number.isNaN(parsedLng)) {
-        setCaptainPosition({ lat: parsedLat, lng: parsedLng });
+        const newPos = { lat: parsedLat, lng: parsedLng };
+        setCaptainPosition(newPos);
         console.log('[LiveTracking] setCaptainPosition', { parsedLat, parsedLng });
+        
+        // Set initial center if not set
+        if (!initialCenterRef.current) {
+          initialCenterRef.current = newPos;
+          lastPanRef.current = newPos;
+        }
+        
+        // Pan with threshold
+        maybePan(newPos);
       }
     } else {
       console.log('[LiveTracking] no captain location found on ride', ride._id);
@@ -112,7 +160,19 @@ const LiveTracking = ({ ride, User }) => {
       if (payload.location?.ltd || payload.location?.lat || payload.location?.latitude) {
         const lat = payload.location.ltd ?? payload.location.lat ?? payload.location.latitude;
         const lng = payload.location.lng ?? payload.location.longitude;
-        if (lat != null && lng != null) setCaptainPosition({ lat: Number(lat), lng: Number(lng) });
+        if (lat != null && lng != null) {
+          const newPos = { lat: Number(lat), lng: Number(lng) };
+          setCaptainPosition(newPos);
+          
+          // Set initial center if not set
+          if (!initialCenterRef.current) {
+            initialCenterRef.current = newPos;
+            lastPanRef.current = newPos;
+          }
+          
+          // Pan with threshold
+          maybePan(newPos);
+        }
       }
     };
     socket.on('captain-location-update', handler);
@@ -121,7 +181,24 @@ const LiveTracking = ({ ride, User }) => {
 
   const handleMapLoad = (map) => {
     mapRef.current = map;
-    if (currentPosition?.lat && map.panTo) map.panTo(currentPosition);
+    
+    // Add drag listeners to pause auto-follow
+    if (map.addListener) {
+      map.addListener('dragstart', () => {
+        userPausedRef.current = true;
+        followRef.current = false;
+        if (resumeTimerRef.current) clearTimeout(resumeTimerRef.current);
+      });
+      
+      map.addListener('dragend', () => {
+        // Resume auto-follow after 6 seconds
+        if (resumeTimerRef.current) clearTimeout(resumeTimerRef.current);
+        resumeTimerRef.current = setTimeout(() => {
+          userPausedRef.current = false;
+          followRef.current = true;
+        }, 6000);
+      });
+    }
   };
 
   // simple colored pin as SVG icon (no embedded text)
@@ -215,7 +292,7 @@ const LiveTracking = ({ ride, User }) => {
     <LoadScript googleMapsApiKey={import.meta.env.VITE_GOOGLE_MAPS_API_KEY}>
       <GoogleMap
         mapContainerStyle={containerStyle}
-        center={captainPosition || currentPosition}
+        center={initialCenterRef.current || captainPosition || currentPosition}
         zoom={15}
         onLoad={handleMapLoad}
         options={mapOptions}
