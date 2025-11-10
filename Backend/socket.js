@@ -165,11 +165,9 @@ const sendMessageToSocketId = (socketId, messageObject) => {
 
     console.log("this msg printed in socket.js -- ", messageObject);
 
-    if (io) {
+   
         io.to(socketId).emit(messageObject.event, messageObject.data);
-    } else {
-        console.log('Socket.io not initialized.');
-    }
+    
 }
 
 const broadcast = (messageObject) => {
