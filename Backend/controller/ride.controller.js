@@ -207,6 +207,16 @@ module.exports.getAllCaptainEvents = async (req, res) => {
   }
 };
 
+module.exports.getAllCaptainRides = async (req, res) => {
+    const { captainId } = req.query;
+    try {
+        const rides = await rideService.getAllCaptainRides(captainId);
+        return res.status(200).json(rides);
+    } catch (err) {
+        return res.status(500).json({ message: err.message });
+    }
+}
+
 module.exports.getAllUserRides = async (req, res) => {
   const { userId } = req.query;
   try {
