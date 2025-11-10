@@ -15,6 +15,11 @@ router.post(
   rideController.confirmRide
 );
 
+router.get('/captainRides',
+    authMiddleware.authCaptain,
+    rideController.getAllCaptainRides
+)
+
 router.get(
   "/start-ride",
   authMiddleware.authCaptain,
