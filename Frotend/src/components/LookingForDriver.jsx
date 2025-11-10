@@ -5,6 +5,7 @@ const VEHICLE_IMAGES = {
     moto: 'https://shorturl.at/5zCIa',
     auto: 'https://shorturl.at/B2YCj',
 };
+
 const LookingForDriver = (props) => {
     const vehicle = props?.vehicleType || 'car';
     const link = VEHICLE_IMAGES[vehicle] || VEHICLE_IMAGES.car;
@@ -37,14 +38,14 @@ const LookingForDriver = (props) => {
                     <div className='flex items-center gap-5 p-3 border-b-2'>
                         <i className="ri-map-pin-user-fill"></i>
                         <div>
-                            <h3 className='text-lg font-medium'>562/11-A</h3>
+                            <h3 className='text-lg font-medium'></h3>
                             <p className='text-sm -mt-1 text-gray-600'>{pickup}</p>
                         </div>
                     </div>
                     <div className='flex items-center gap-5 p-3 border-b-2'>
                         <i className="text-lg ri-map-pin-2-fill"></i>
                         <div>
-                            <h3 className='text-lg font-medium'>562/11-A</h3>
+                            <h3 className='text-lg font-medium'></h3>
                             <p className='text-sm -mt-1 text-gray-600'>{destination}</p>
                         </div>
                     </div>
@@ -52,7 +53,7 @@ const LookingForDriver = (props) => {
                         <i className="ri-currency-line"></i>
                         <div>
                             <h3 className='text-lg font-medium'>₹{fareDisplay}</h3>
-                            <p className='text-sm -mt-1 text-gray-600'>Cash</p>
+                            <p className='text-sm -mt-1 text-gray-600'>CASH/ONLINE</p>
                         </div>
                     </div>
                 </div>
