@@ -396,18 +396,108 @@ VITE_SOCKET_URL=http://localhost:3000
 npm run build
 ```
 
-### Deploy Static Files
-Upload the `dist/` folder to:
-- Vercel
-- Netlify
-- AWS S3
-- GitHub Pages
-- Any static hosting service
+Output: `dist/` folder (static files ready for deployment)
 
-### Environment Setup
-- Set environment variables in hosting platform
-- Ensure backend API is accessible from frontend domain
-- Configure CORS on backend for production domain
+### Deploy to Render
+
+#### Backend Deployment (Node.js)
+1. **Create a new Web Service on Render**
+   - Connect your GitHub repository
+   - Select the `Backend` directory as root
+
+2. **Configure Environment Variables**
+   ```
+   PORT=3000
+   MONGODB_URI=your_mongodb_connection_string
+   JWT_SECRET=your_secret_key
+   GOOGLE_MAPS_API_KEY=your_api_key
+   ```
+
+3. **Set Build Command**
+   ```bash
+   npm install
+   ```
+
+4. **Set Start Command**
+   ```bash
+   npm start
+   ```
+
+5. **Deploy** - Render will automatically deploy on push to master
+
+#### Frontend Deployment (React/Vite)
+1. **Create a new Static Site on Render**
+   - Connect your GitHub repository
+   - Select the `Frontend` directory as root
+
+2. **Configure Build Settings**
+   - **Build Command:** `npm install && npm run build`
+   - **Publish Directory:** `dist`
+
+3. **Set Environment Variables** in Render dashboard
+   ```
+   VITE_BASE_URL=https://your-backend-url.onrender.com
+   VITE_GOOGLE_MAPS_API_KEY=your_api_key
+   VITE_SOCKET_URL=https://your-backend-url.onrender.com
+   ```
+
+4. **Deploy** - Render will automatically deploy on push to master
+
+### After Deployment
+
+1. **Update Frontend `.env`** to use deployed backend URL
+   ```env
+   VITE_BASE_URL=https://abhigo-backend.onrender.com
+   VITE_GOOGLE_MAPS_API_KEY=your_api_key
+   VITE_SOCKET_URL=https://abhigo-backend.onrender.com
+   ```
+
+2. **Update Backend CORS settings** to allow frontend domain
+   ```javascript
+   cors({
+     origin: 'https://abhigo-frontend.onrender.com',
+     credentials: true
+   })
+   ```
+
+3. **Test the deployed application**
+   - Visit your frontend URL
+   - Sign up and test all features
+   - Check browser console for errors
+   - Monitor Render logs for backend issues
+
+### Render Service Links
+
+Once deployed, you'll have:
+- **Frontend URL:** `https://your-frontend-name.onrender.com`
+- **Backend URL:** `https://your-backend-name.onrender.com`
+
+Both services will automatically redeploy when you push to the master branch.
+
+---
+
+### Alternative Deployment Options
+
+- **Vercel** - Best for React/Vite frontend
+- **Netlify** - Alternative for static sites
+- **Heroku** - Alternative for backend (note: free tier discontinued)
+- **AWS** - Scalable production option
+- **GitHub Pages** - Free static hosting (frontend only)
+
+---
+
+## 📊 Deployment Checklist
+
+- [ ] Backend deployed on Render with MongoDB connection
+- [ ] Frontend deployed on Render with build optimizations
+- [ ] Environment variables configured on both services
+- [ ] CORS settings updated for production domain
+- [ ] SSL/TLS enabled (automatic on Render)
+- [ ] Tested sign up, login, ride booking flows
+- [ ] Tested real-time features (chat, location tracking)
+- [ ] Checked browser console for errors
+- [ ] Monitored server logs for issues
+- [ ] Set up error monitoring/logging (optional: Sentry)
 
 ---
 
@@ -447,5 +537,5 @@ For issues or questions:
 
 ---
 
-
 Happy Coding! 🚀
+
