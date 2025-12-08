@@ -1,4 +1,4 @@
-# AbhiGo - Ride Sharing Platform (Frontend)
+# AbhiGo - Ride Booking Platform (Frontend)
 
 ## 📱 Project Overview
 
