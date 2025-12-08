@@ -10,6 +10,7 @@ function UserLogin() {
   let [email, setEmail] = useState("");
   let [password, setPassword] = useState("");
   let [userdata, setUserdata] = useState({});
+  let [error, setError] = useState("");
   const {user,setUser} = useContext(UserDataContext);
   const navigate=useNavigate();
   // Modal visibility only (logic moved to component)
@@ -18,21 +19,31 @@ function UserLogin() {
   const closeForgot = () => setShowForgot(false)
   const handleSubmit = async(e) => {
     e.preventDefault();
+    setError("");
     const userdata={
       Email: email,
       pasword: password
     };
     
-    
-    const response=await axios.post(`${import.meta.env.VITE_BASE_URL}/users/login`,userdata);
-    if(response.status===200){
-      const data=response.data;
-      setUser(data.user);
-      localStorage.setItem("token",data.token);
-      navigate("/home");
+    try {
+      const response=await axios.post(`${import.meta.env.VITE_BASE_URL}/users/login`,userdata);
+      if(response.status===200){
+        const data=response.data;
+        setUser(data.user);
+        localStorage.setItem("token",data.token);
+        navigate("/home");
+      }
+      setEmail("");
+      setPassword("");
+    } catch (err) {
+      if (err.response && err.response.status === 401) {
+        setError("Invalid email or password. Please try again.");
+      } else if (err.response && err.response.data && err.response.data.message) {
+        setError(err.response.data.message);
+      } else {
+        setError("Login failed. Please try again.");
+      }
     }
-    setEmail("");
-    setPassword("");
   }
   return (
     <>
@@ -42,6 +53,11 @@ function UserLogin() {
         <img src={abhi} alt="abhi" className=" h-25 w-60 mb-2" />
         <form onSubmit={(e) => { handleSubmit(e) }}>
           <h3 className="text-lg font-semibold mb-3">What is your Email ? </h3>
+          {error && (
+            <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded mb-4">
+              {error}
+            </div>
+          )}
           <input required type="email" value={email} onChange={(e) => { setEmail(e.target.value) }} placeholder="example@gmail.com" className="text-lg mb-5 bg-[#eeeeee] placeholder:base border w-full px-4 py-2 " />
           <h3 className="text-lg font-semibold mb-3 ">Enter Your Password : </h3>
           <input required type="password" value={password} onChange={(e) => { setPassword(e.target.value) }} className="text-lg mb-5 bg-[#eeeeee] placeholder:text-base border w-full px-4 py-2" placeholder="password" />
