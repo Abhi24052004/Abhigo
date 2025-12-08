@@ -11,6 +11,7 @@ const Captainlogin = () => {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [showForgot, setShowForgot] = useState(false)
+  const [error, setError] = useState('')
 
   const { captain, setCaptain } = useContext(CaptainDataContext)
   const navigate = useNavigate()
@@ -19,25 +20,36 @@ const Captainlogin = () => {
 
   const submitHandler = async (e) => {
     e.preventDefault();
+    setError('');
     const captain = {
       email: email,
       password
     }
 
-    const response = await axios.post(`${import.meta.env.VITE_BASE_URL}/captains/login`, captain)
+    try {
+      const response = await axios.post(`${import.meta.env.VITE_BASE_URL}/captains/login`, captain)
 
-    if (response.status === 200) {
-      const data = response.data;
+      if (response.status === 200) {
+        const data = response.data;
 
-      setCaptain(data.captain)
-      localStorage.setItem('token', data.token)
+        setCaptain(data.captain)
+        localStorage.setItem('token', data.token)
 
-      navigate('/captain/home');
+        navigate('/captain/home');
 
+      }
+
+      setEmail('')
+      setPassword('')
+    } catch (err) {
+      if (err.response && err.response.status === 401) {
+        setError("Invalid email or password. Please try again.");
+      } else if (err.response && err.response.data && err.response.data.message) {
+        setError(err.response.data.message);
+      } else {
+        setError("Login failed. Please try again.");
+      }
     }
-
-    setEmail('')
-    setPassword('')
   }
   return (
     <>
@@ -48,6 +60,11 @@ const Captainlogin = () => {
           submitHandler(e)
         }}>
           <h3 className='text-lg font-medium mb-2'>What's your email</h3>
+          {error && (
+            <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded mb-4">
+              {error}
+            </div>
+          )}
           <input
             required
             value={email}
