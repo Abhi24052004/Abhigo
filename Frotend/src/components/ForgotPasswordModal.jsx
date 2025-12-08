@@ -93,12 +93,39 @@ The AbhiGo Support Team
         setStep('reset')
     }
 
+    const validatePassword = (pwd) => {
+        const minLength = 8;
+        const hasUpperCase = /[A-Z]/.test(pwd);
+        const hasLowerCase = /[a-z]/.test(pwd);
+        const hasNumber = /[0-9]/.test(pwd);
+        const hasSpecialChar = /[!@#$%^&*(),.?":{}|<>]/.test(pwd);
+
+        if (pwd.length < minLength) {
+            return "Password must be at least 8 characters long";
+        }
+        if (!hasUpperCase) {
+            return "Password must contain at least one uppercase letter";
+        }
+        if (!hasLowerCase) {
+            return "Password must contain at least one lowercase letter";
+        }
+        if (!hasNumber) {
+            return "Password must contain at least one number";
+        }
+        if (!hasSpecialChar) {
+            return "Password must contain at least one special character";
+        }
+        return null;
+    };
+
     const submitNewPassword = async () => {
         setError('')
         setInfo('')
         if (!newPass || !confirmPass) return setError('Fill both password fields')
         if (newPass !== confirmPass) return setError('Passwords do not match')
-        if (newPass.length < 6) return setError('Password must be at least 6 characters')
+        
+        const passwordError = validatePassword(newPass);
+        if (passwordError) return setError(passwordError)
         try {
             setLoading(true)
             if (isUser) {
